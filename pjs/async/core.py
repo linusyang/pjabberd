@@ -164,7 +164,7 @@ class _dispatcher_with_sendWithFunctions(asyncore.dispatcher_with_send):
         assert(isinstance(checkFunc, pjs.utils.FunctionCall) and callable(cb))
 
         if (initFunc):
-            assert(hasattr(initFunc, 'func'))
+            assert(isinstance(initFunc, pjs.utils.FunctionCall))
             try:
                 initFunc.func(*initFunc.funcArgs)
             except Exception, e:
