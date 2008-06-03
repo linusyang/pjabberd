@@ -2,6 +2,7 @@ from pjs.connection import Connection
 from pjs.async.core import dispatcher
 import pjs.async.core
 import socket
+from pjs.db import db
 
 class Server(dispatcher):
     def __init__(self, ip, port):
@@ -26,5 +27,15 @@ class Server(dispatcher):
         self.close()
         
 if __name__ == '__main__':
+    
+    c = db.cursor()
+    c.execute("CREATE TABLE users (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,\
+                                   jid TEXT NOT NULL,\
+                                   username TEXT NOT NULL,\
+                                   password TEXT NOT NULL,\
+                                   UNIQUE(jid))")
+    c.execute("INSERT INTO users (jid, username, password) VALUES ('tro@localhost', 'tro', 'test')")
+    c.close()
+    
     s = Server('localhost', 44444)
     pjs.async.core.loop()

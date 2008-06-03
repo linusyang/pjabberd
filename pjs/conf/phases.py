@@ -10,7 +10,7 @@ phases = {
                        'description' : 'default phase for when no other matches'
                        },
           'stream-init' : {
-                           'description' : 'initializes stream data',
+                           'description' : 'initializes stream data and sends out features',
                            'handlers' : [h['stream-init'], h['features-out'], h['write']]
                            },
           'features' : {
@@ -21,13 +21,18 @@ phases = {
           'sasl-auth' : {
                          'description' : 'SASL\'s <auth>',
                          'xpath' : '{urn:ietf:params:xml:ns:xmpp-sasl}auth',
-                         'handlers' : []
+                         'handlers' : [h['sasl-auth'], h['write']]
                          },
           'sasl-response' : {
                              'description' : 'SASL client\'s response to challenge',
                              'xpath' : '{urn:ietf:params:xml:ns:xmpp-sasl}response',
                              'handlers' : []
                              },
+          'sasl-abort' : {
+                          'description' : 'initiating entity aborts auth',
+                          'xpath' : '{urn:ietf:params:xml:ns:xmpp-sasl}abort',
+                          'handlers' : []
+                          },
           'stream-reinit' : {
                              'description' : 'new stream where one already exists',
                              'handlers' : []

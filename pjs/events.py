@@ -131,7 +131,7 @@ class _Dispatcher(object):
             # the stanza
             # FIXME: this is likely to be a bottleneck
             for p in phases:
-                if p.has_key('xpath') and tree.find(p['xpath']) is not None:
+                if phases[p].has_key('xpath') and tree.find(phases[p]['xpath']) is not None:
                     phase = phases[p]
                     phaseName = p
 

@@ -1,8 +1,9 @@
 """ XML Stream parsers """
 
 from xml.parsers import expat
-import pjs.elementtree.ElementTree as et
 from pjs.events import Dispatcher
+import pjs.elementtree.ElementTree as et
+from copy import copy
 
 def borrow_parser(conn):
     """Borrow a parser from a pool of parsers"""
@@ -107,8 +108,12 @@ class IncrStreamParser:
             self.tree.end(self._fixname(tag))
             # TODO: handle errors
             self.tree = self.tree.close()
-            # TODO: pass the el to the dispatcher for processing
-            Dispatcher().dispatch(self.tree, self.conn)
+            
+            # pass the el to the dispatcher for processing having wrapped it
+            # in the <stream> element first
+            tree = copy(self.stream)
+            tree.append(self.tree)
+            Dispatcher().dispatch(tree, self.conn)
         else:
             # depth > 1. continue to build tree
             assert(self.tree)

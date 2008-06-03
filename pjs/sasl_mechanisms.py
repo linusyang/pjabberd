@@ -1,6 +1,5 @@
 """Plain and DigestMD5 are borrowed from twisted's words.protocols.jabber with
 some extra bits removed."""
-# Copyright (c) 2001-2007 Twisted Matrix Laboratories.
 # see TWISTED-LICENSE for details
 
 import binascii, time, os, random

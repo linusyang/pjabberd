@@ -4,6 +4,7 @@ import pjs.handlers.write
 import pjs.handlers.simple
 import pjs.handlers.stream
 import pjs.handlers.iq
+import pjs.handlers.sasl
 
 # TODO: add functions to fetch handlers from the config file
 
@@ -27,5 +28,9 @@ handlers = {
             'iq-not-implemented' : {
                                     'handler' : pjs.handlers.iq.IQNotImplementedHandler,
                                     'description' : 'returns a iq-not-implemented error'
-                                    }
+                                    },
+            'sasl-auth' : {
+                           'handler' : pjs.handlers.sasl.SASLAuthHandler,
+                           'description' : 'incoming SASL auth handler'
+                           }
             }
