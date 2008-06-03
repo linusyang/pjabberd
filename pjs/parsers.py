@@ -137,6 +137,9 @@ class IncrStreamParser:
                                             {'version' : '1.0'})
                     self.ns = 'jabber:client'
                     self.enable()
+                    
+                    # pretend we got session, since we won't
+                    self.conn.data['user']['in-session'] = True
             else:
                 logging.debug("[%s] Parser got quirky input and doesn't " +\
                               "know how to proceed. Ignoring data: %s",
