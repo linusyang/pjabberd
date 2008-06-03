@@ -71,6 +71,7 @@ class S2SPresenceHandler(Handler):
             data.set('to', '%s/%s' % (jid, res))
             return data
         
+        logging.debug("[%s] Routing %s", self.__class__, tostring(tree[0]))
         msg.conn.server.launcher.router.routeToClient(msg, tree[0], tree[0].get('to'), rewriteTo)
     
 class S2SSubscriptionHandler(ThreadedHandler):
@@ -137,7 +138,9 @@ class S2SSubscriptionHandler(ThreadedHandler):
                                             Subscription.FROM_PENDING_OUT,
                                             Subscription.BOTH):
                     # TODO: auto-reply with "subscribed" stanza
-                    pass
+                    doRoute = False
+                    out = "<presence to='%s' from='%s' type='subscribed'/>" % (cjid.getBare(), jid.getBare())
+                    msg.conn.server.launcher.router.routeToServer(msg, out, cjid.getBare())
                 # ignore presence in other states
                 
                 if doRoute:
@@ -161,6 +164,8 @@ class S2SSubscriptionHandler(ThreadedHandler):
                             subscription = Subscription.BOTH
                         
                         # forward the subscribed presence
+                        logging.debug("Forwarding subscribed presence to clients: %s",
+                                      tostring(tree[0]))
                         msg.conn.server.launcher.router.routeToClient(msg, tree[0], jid)
                             
                         # create an updated roster item for roster push
@@ -323,9 +328,11 @@ class C2SSubscriptionHandler(ThreadedHandler):
                         jidForResources = resources.has_key(jid) and resources[jid]
                         if jidForResources:
                             out = u''
+                            logging.debug("!!! jidForResources: %d", len(jidForResources))
                             for i in jidForResources:
                                 out += "<presence from='%s/%s'" % (jid, i)
                                 out += " to='%s'/>" % cjid.getBare()
+                            logging.debug("!!! About to route %s", out)
                             # and route it
                             msg.conn.server.launcher.router.routeToServer(msg, out, cjid)
                         

@@ -13,7 +13,8 @@ class Server(dispatcher):
         # this includes both c2s and s2s connections
         # used by dispatchers to look up connections
         # {connId => (JID, Connection)}
-        self.conns = SynchronizedDict()
+        #self.conns = SynchronizedDict()
+        self.conns = {}
         
         self.ip = ip
         self.hostname = ip
@@ -27,7 +28,8 @@ class Server(dispatcher):
         # JID.
         # TODO: make this accessible even when the server's clustered
         #       ie. different machines should be able to access this.
-        self.data = SynchronizedDict()
+        #self.data = SynchronizedDict()
+        self.data = {}
         self.data['info'] = {}
         
         
@@ -67,7 +69,8 @@ class S2SServer(Server):
         self.data['info']['type'] = 's2s'
         
         # {'domain' => [<Connection> for in, <Connection> for out]}
-        self.s2sConns = SynchronizedDict()
+        #self.s2sConns = SynchronizedDict()
+        self.s2sConns = {}
         
     def createOutConnection(self, sock):
         conn = ServerOutConnection(sock, sock.getsockname(), self)

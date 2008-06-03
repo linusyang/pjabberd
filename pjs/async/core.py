@@ -537,25 +537,7 @@ class dispatcher_with_send(dispatcher):
 # ---------------------------------------------------------------------------
 # used for debugging.
 # ---------------------------------------------------------------------------
-
-def compact_traceback():
-    t, v, tb = sys.exc_info()
-    tbinfo = []
-    assert tb # Must have a traceback
-    while tb:
-        tbinfo.append((
-            tb.tb_frame.f_code.co_filename,
-            tb.tb_frame.f_code.co_name,
-            str(tb.tb_lineno)
-            ))
-        tb = tb.tb_next
-
-    # just to be safe
-    del tb
-
-    file, function, line = tbinfo[-1]
-    info = ' '.join(['[%s|%s|%s]' % x for x in tbinfo])
-    return (file, function, line), t, v, info
+from pjs.utils import compact_traceback
 
 def close_all(map=None):
     if map is None:

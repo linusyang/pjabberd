@@ -27,6 +27,10 @@ class IncrStreamParser:
         self.conn = conn
         self._parser = None
         
+        # FIXME: remove these 2 lines
+        self.seenSoFar = ''
+        self.resets = 0
+        
         self.resetParser()
         self.resetStream()
     
@@ -60,6 +64,8 @@ class IncrStreamParser:
         # need to reset parts of the stream as well to ensure correct parsing
         self.depth = 0
         self.tree = None
+        
+        self.resets += 1
 
     def feed(self, data):
         """Read a chunk of data to parse. The complete XML in the chunk will
@@ -73,7 +79,12 @@ class IncrStreamParser:
         # FIXME: delete the next two lines
         if data == "<presence to='dv@localhost' type='subscribe' from='tro@localhost'/>":
             logging.info("Parser about to eat S2S presence")
+            
+        if self.conn.id.find('sin') != -1 or self.conn.id.find('sout') != -1:
+            self.seenSoFar += data
+            logging.debug("Parser for connection %s seen so far: %s", self.conn.id, self.seenSoFar)
         self._parser.Parse(data, 0)
+        a = 1+1
 
     def close(self):
         """CLose the stream of XML data"""
@@ -141,6 +152,14 @@ class IncrStreamParser:
             # in the <stream> element first
             tree = deepcopy(self.stream)
             tree.append(self.tree)
+            
+            # FIXME: remove this
+            if tree[0].tag == '{jabber:server}presence' and\
+            tree[0].get('type') == 'subscribe' and\
+            tree[0].get('to') == 'dv@localhost' and\
+            tree[0].get('from') == 'tro@localhost':
+                logging.debug("Got the S2S presence")
+                    
             if IncrStreamParser.c2sStanzaRe.search(self.tree.tag):
                 C2SStanzaDispatcher().dispatch(tree, self.conn)
             elif IncrStreamParser.s2sStanzaRe.search(self.tree.tag):
@@ -149,7 +168,7 @@ class IncrStreamParser:
                 tree[0].get('type') == 'subscribe' and\
                 tree[0].get('to') == 'dv@localhost' and\
                 tree[0].get('from') == 'tro@localhost':
-                    logging.debug("Got the S2S presence")
+                    logging.debug("About to run the dispatcher on the S2S presence")
                 S2SStanzaDispatcher().dispatch(tree, self.conn)
             else:
                 Dispatcher().dispatch(tree, self.conn)

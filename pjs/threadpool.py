@@ -35,6 +35,8 @@ __version__ = "1.1"
 __date__ = "2005-07-19"
 
 import threading, Queue
+import logging
+from pjs.utils import compact_traceback
 
 class NoResultsPending(Exception):
     """All work requests have been processed."""
@@ -82,6 +84,8 @@ class WorkerThread(threading.Thread):
                 retVal = request.callable(*request.args, **request.kwds)
             except Exception, e:
                 retVal = e
+                nil, t, v, tbinfo = compact_traceback()
+                logging.debug("Exception in thread: %s: %s -- %s", t,v,tbinfo)
             
             self.resultQueue.put((request, retVal))
             

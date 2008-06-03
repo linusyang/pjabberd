@@ -3,6 +3,7 @@ import logging
 from pjs.elementtree.ElementTree import Element
 from pjs.handlers.write import prepareDataForSending
 from pjs.jid import JID
+from threading import RLock
 
 class Router:
     """Handles routing of outgoing messages"""
@@ -14,6 +15,8 @@ class Router:
         self.c2sserver = launcher.getC2SServer()
         self.s2sserver = launcher.getS2SServer()
         self.s2sConns = self.s2sserver.s2sConns
+        
+        self.lock = RLock()
         
     def setS2SConnMap(self, connMap):
         """This is the connection map that will be used to lookup domains
@@ -31,14 +34,17 @@ class Router:
         returns False.
         msg: Message object. Needed to look up client conns.
         """
+        self.lock.acquire()
         conns = self.c2sserver.conns
         
         to = self.getRoute(data, to)
         if not to:
+            self.lock.release()
             return False
         
         jid = self.getJID(to)
         if not jid:
+            self.lock.release()
             return False
         
         if jid.resource:
@@ -53,11 +59,14 @@ class Router:
                 return jidConn[0].node == jid.node and jidConn[0].domain == jid.domain
             
         activeJids = filter(f, conns)
+        logging.debug("activeJids: %s", activeJids)
         for con in activeJids:
             if callable(preprocessFunc):
                 conns[con][1].send(prepareDataForSending(preprocessFunc(data, conns[con][1])))
             else:
                 conns[con][1].send(prepareDataForSending(data))
+                
+        self.lock.release()
     
     def routeToServer(self, msg, data, to=None):
         """Routes 'data' to its recipient. 'To' should be either a string JID
@@ -69,15 +78,20 @@ class Router:
         # TODO: implement S2S
         # for now, just route to ourselves
         
+        self.lock.acquire()
+        
         if self.s2sConns is None:
+            self.lock.release()
             return False
         
         to = self.getRoute(data, to)
         if not to:
+            self.lock.release()
             return False
         
         jid = self.getJID(to)
         if not jid:
+            self.lock.release()
             return False
 
         # do we have an existing connection to the domain?
@@ -100,6 +114,7 @@ class Router:
             
             msg.setNextHandler('new-s2s-conn')
         
+        self.lock.release()
         return True
     
     def getRoute(self, data, to):

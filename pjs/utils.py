@@ -7,7 +7,7 @@ try:
 except ImportError:
     from sha import new as sha1
     
-import time, os, re
+import time, os, re, sys
 
 standardNSre = re.compile(r'^{jabber:(client|server)}', re.UNICODE)
 customNSre = re.compile(r'^{(.*?)}(.*)')
@@ -85,6 +85,29 @@ def decurl(tagName):
     else:
         tag = res[:end]
     return res, tag
+
+def compact_traceback():
+    """Used in asyncore and threadpool. Can be called in an except clause
+    to get the stack trace for the exception.
+    Returns ((file, function, line), type, value, stack-as-a-string)
+    """
+    t, v, tb = sys.exc_info()
+    tbinfo = []
+    assert tb # Must have a traceback
+    while tb:
+        tbinfo.append((
+            tb.tb_frame.f_code.co_filename,
+            tb.tb_frame.f_code.co_name,
+            str(tb.tb_lineno)
+            ))
+        tb = tb.tb_next
+
+    # just to be safe
+    del tb
+
+    file, function, line = tbinfo[-1]
+    info = ' '.join(['[%s|%s|%s]' % x for x in tbinfo])
+    return (file, function, line), t, v, info
 
 class PrioritizedDict(dict):
     """A dictionary that has order during iteration based on a 'priority'
