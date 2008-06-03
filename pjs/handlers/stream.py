@@ -208,7 +208,63 @@ class NewS2SConnHandler(ThreadedHandler):
         return self.retVal
 
 class StreamEndHandler(Handler):
-    """Handler for closing the stream"""
-
+    """Handles the other side closing the stream. For clients, this sends out
+    the unavailable presence if the client was an active resource. For that
+    case, the handler has to be able to modify the tree, so it has to be passed
+    an existing Element as the tree, which it will alter and pass onto the
+    presence handler.
+    """
     def handle(self, tree, msg, lastRetVal=None):
-        msg.conn.data['stream']['in-stream'] = False
+        data = msg.conn.data
+        closing = data['stream']['closing']
+        if closing:
+            # already closing the connection
+            msg.stopChain = True
+            return
+        else:
+            data['stream']['closing'] = True
+        
+        data['stream']['in-stream'] = False
+        
+        if data.has_key('user'):
+            # closing stream for the client
+            jid = data['user']['jid']
+            resource = data['user']['resource']
+            
+            if data['user']['active']:
+                # if the user has ever sent out the available presence, they're
+                # an active resource. for these, we want to broadcast their
+                # unavailable presence (3921 #5.1.5)
+                
+                assert isinstance(tree, Element)
+                
+                # we need to rewrite the tree to contain a faked unavailable
+                # presence stanza
+                tree.tag = 'presence'
+                tree.set('type', 'unavailable')
+                
+                msg.setNextHandler('c2s-presence')
+        
+class CleanUpConnHandler(Handler):
+    """This cleans up all connection data and closes the connection"""
+    def handle(self, tree, msg, lastRetVal=None):
+        conn = msg.conn
+        data = msg.conn.data
+        
+        if data.has_key('user'):
+            jid = data['user']['jid']
+            resource = data['user']['resource']
+            del msg.conn.server.data['resources'][jid][resource]
+        
+        del conn.server.conns[conn.id]
+        
+        try:
+            conn.parser.close()
+        except:
+            pass
+        conn.parser.resetStream()
+        
+        logging.debug("[%s] Closing ClientConnection with %s",
+                      self.__class__, jid)
+        
+        conn.close()

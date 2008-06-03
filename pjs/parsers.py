@@ -217,7 +217,8 @@ class IncrStreamParser:
         
         if self.depth == 0:
             wrapperEl = et.Element('wrapper')
-            wrapperEl.append(self.stream)
+            dummyEl = et.Element('tag')
+            wrapperEl.append(dummyEl)
             Dispatcher().dispatch(wrapperEl, self.conn, 'stream-end')
             self.resetStream()
             self.resetParser()

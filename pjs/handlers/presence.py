@@ -2,8 +2,7 @@ import logging
 import pjs.threadpool as threadpool
 
 from pjs.handlers.base import ThreadedHandler, Handler, chainOutput, poll
-from pjs.handlers.write import prepareDataForSending
-from pjs.elementtree.ElementTree import Element, SubElement
+from pjs.elementtree.ElementTree import Element
 from pjs.utils import FunctionCall, tostring
 from pjs.roster import Roster, Subscription
 from pjs.jid import JID
@@ -66,21 +65,14 @@ class C2SPresenceHandler(ThreadedHandler):
                     # they're sent first. see below
                     
                 # broadcast to other resources of this user
-                resources = msg.conn.server.data['resources'][jid]
-                for r in resources:
-                    if r != resource:
-                        otherRes = jid + '/' + r
-                        presTree.set('to', otherRes)
-                        presRouteData = {
-                             'to' : otherRes,
-                             'data' : presTree
-                             }
-                        retVal = chainOutput(retVal, presRouteData)
-                        msg.setNextHandler('route-server')
+                retVal = self.broadcastToOtherResources(presTree, msg, retVal, jid, resource)
                 
             elif tree.get('to') is not None:
                 # TODO: directed presence
                 return
+            elif tree.get('type') == 'unavailable':
+                # broadcast to other resources of this user
+                retVal = self.broadcastToOtherResources(presTree, msg, retVal, jid, resource)
             
             # record this stanza as the last presence sent from this client
             lastPresence = deepcopy(tree)
@@ -131,6 +123,33 @@ class C2SPresenceHandler(ThreadedHandler):
     
     def resume(self):
         return self.retVal
+    
+    def broadcastToOtherResources(self, tree, msg, lastRetVal,
+                                  jid=None, resource=None):
+        """Takes in the stanza to broadcast to other resources of this
+        user and sets the next handler to route-server. Returns the
+        lastRetVal with chained route-server handlers.
+        
+        tree -- tree to modify with the 'to' address and send out
+        """
+        jid = jid or msg.conn.data['user']['jid']
+        resource = resource or msg.conn.data['user']['resource']
+        
+        retVal = lastRetVal
+        
+        resources = msg.conn.server.data['resources'][jid]
+        for r in resources:
+            if r != resource:
+                otherRes = jid + '/' + r
+                tree.set('to', otherRes)
+                presRouteData = {
+                     'to' : otherRes,
+                     'data' : tree
+                     }
+                retVal = chainOutput(lastRetVal, presRouteData)
+                msg.setNextHandler('route-server')
+                
+        return retVal
     
 class S2SPresenceHandler(Handler):
     """Handles plain <presence> (without type) sent by the servers"""

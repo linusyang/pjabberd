@@ -33,8 +33,12 @@ handlers = {
                                },
             'stream-end' : {
                             'handler' : pjs.handlers.stream.StreamEndHandler,
-                            'description' : 'cleans up when the stream is ended by the other side'
+                            'description' : 'reacts to the stream being ended by the other side'
                             },
+            'cleanup-conn' : {
+                              'handler' : pjs.handlers.stream.CleanUpConnHandler,
+                              'description' : 'cleans up the connection when closed'
+                              },
             'features-init' : {
                                'handler' : pjs.handlers.stream.FeaturesInitHandler,
                                'description' : 'sends out initial features'

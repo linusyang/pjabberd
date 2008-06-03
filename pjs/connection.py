@@ -4,6 +4,7 @@ import logging
 import socket
 
 from pjs.elementtree.ElementTree import Element
+from pjs.events import Dispatcher
 #from tlslite.integration.TLSAsyncDispatcherMixIn import TLSAsyncDispatcherMixIn
 
 class Connection(asyncore.dispatcher_with_send):
@@ -22,6 +23,7 @@ class Connection(asyncore.dispatcher_with_send):
         self.data['stream'] = {
                                'in-stream' : False, # False before <stream> sent and after </stream>
                                'id' : '',
+                               'closing' : False, # True if in the process of closing connection
                                }
         self.data['sasl'] = {
                              'mech' : 'DIGEST-MD5', # or PLAIN
@@ -86,17 +88,18 @@ class ClientConnection(Connection):
                      self.__class__, self.addr)
         
     def handle_close(self):
-        # this resource is no longer connected
-        jid = self.data['user']['jid']
-        resource = self.data['user']['resource']
+        # we want to be able to do stuff in handlers when the connection is
+        # closed, so we dispatch into the 'stream-end' phase.
         
-        logging.debug("[%s] Closing ClientConnection with %s",
-                      self.__class__, jid)
-        
-        if jid:
-            del self.server.data['resources'][jid][resource]
-        
-        Connection.handle_close(self)
+        # we set the tree to a dummy element so that the handlers could modify
+        # it.
+        if self.data['stream']['closing']:
+            # already closing
+            return
+        wrapper = Element('wrapper')
+        tree = Element('tag')
+        wrapper.append(tree)
+        Dispatcher().dispatch(wrapper, self, 'stream-end')
 
 class ServerConnection(Connection):
     """A connection between two servers"""

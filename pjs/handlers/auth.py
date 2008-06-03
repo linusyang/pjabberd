@@ -207,7 +207,7 @@ class IQAuthGetHandler(Handler):
         # check for policy violation
         violation = checkPolicyViolation(msg)
         if violation is not None:
-            msg.setLastHandler('stream-end')
+            msg.setLastHandler('close-stream')
             return chainOutput(lastRetVal, violation)
         else:
             msg.conn.data['iqauth']['in-progress'] = True
@@ -234,7 +234,7 @@ class IQAuthSetHandler(ThreadedHandler):
             # check for policy violation
             violation = checkPolicyViolation(msg)
             if violation is not None:
-                msg.setLastHandler('stream-end')
+                msg.setLastHandler('close-stream')
                 return chainOutput(lastRetVal, violation)
             
             id = tree.get('id')

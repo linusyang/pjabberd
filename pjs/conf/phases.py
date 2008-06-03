@@ -25,8 +25,12 @@ _corePhases = {
                                },
           'stream-end' : {
                           'description' : 'stream ended by the other side',
-                          'handlers' : [h['stream-end']]
+                          'handlers' : [h['stream-end'], h['cleanup-conn']]
                           },
+          'close-stream' : {
+                            'description' : 'we actively close the stream',
+                            'handlers' : []
+                            },
           'features' : {
                         'description' : 'stream features such as TLS and resource binding',
                         'xpath' : '{http://etherx.jabber.org/streams}features',
