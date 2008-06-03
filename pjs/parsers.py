@@ -90,12 +90,12 @@ class IncrStreamParser:
             # we don't want to deal with changed namespaces or attributes
             # for now.
             if self.stream is not None:
-                Dispatcher().dispatch(self.stream, self.conn, 'stream-reinit')
+                Dispatcher().dispatch(self.stream, self.conn, 'in-stream-reinit')
                 return
             
             # handle <stream>, record it for XPath wrapping
             self.stream = et.Element(self._fixname(tag), attrs)
-            Dispatcher().dispatch(self.stream, self.conn, 'stream-init')
+            Dispatcher().dispatch(self.stream, self.conn, 'in-stream-init')
         elif self.depth == 2:
             # handle stanzas, build tree
             self.tree = et.TreeBuilder()

@@ -1,11 +1,17 @@
 import logging
+import socket
+import pjs.conf.conf
+import pjs.server
+import pjs.threadpool as threadpool
 
-from pjs.handlers.base import Handler, chainOutput
-from pjs.utils import generateId
+from pjs.handlers.base import Handler, ThreadedHandler, chainOutput, poll
+from pjs.utils import generateId, FunctionCall
 from pjs.elementtree.ElementTree import Element, SubElement
 
-class StreamInitHandler(Handler):
-    """Handler for initializing the stream"""
+class InStreamInitHandler(Handler):
+    """Handler for initializing the stream when it was initiated by the
+    remote side.
+    """
     def handle(self, tree, msg, lastRetVal=None):
         # Expat removes the xmlns attributes, so we save them in the parser
         # class and check them here.
@@ -36,9 +42,10 @@ class StreamInitHandler(Handler):
                 "xmlns:stream='http://etherx.jabber.org/streams' " + \
                 "version='1.0'>")
         
-class StreamReInitHandler(Handler):
-    """Handler for a reinitialized stream, such as after TLS/SASL. It is
-    assumed that an initial stream element was already sent some time ago.
+class InStreamReInitHandler(Handler):
+    """Handler for a remotely reinitialized stream, such as after TLS/SASL.
+    It is assumed that an initial stream element was already sent some time
+    ago.
     """
     def handle(self, tree, msg, lastRetVal=None):
     
@@ -94,6 +101,81 @@ class FeaturesPostAuthHandler(Handler):
                    {'xmlns' : 'urn:ietf:params:xml:ns:xmpp-session'})
                 
         return chainOutput(lastRetVal, res)
+
+class NewS2SConnHandler(ThreadedHandler):
+    """Creates a new outgoing s2s connection. Gets its data from
+    the conn.data dict with key 'new-s2s-conn'.
+    
+    This is threaded because socket.connect will block.
+    """
+    def __init__(self):
+        # this is true when the threaded handler returns
+        self.done = False
+        # used to pass the output to the next handler
+        self.retVal = None
+        
+    def handle(self, tree, msg, lastRetVal=None):
+        self.done = False
+        self.retVal = lastRetVal
+        tpool = msg.conn.server.threadpool
+        
+        def act():
+            d = msg.conn.data
+            if not d.has_key('new-s2s-conn') or \
+                not d['new-s2s-conn'].has_key('hostname') or \
+                not d['new-s2s-conn'].has_key('ip'):
+                logging.warning("[NewS2SConnHandler] Invoked without necessary data in connection")
+                return
+            
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.connect((d['new-s2s-conn']['ip'],
+                          d['new-s2s-conn'].setdefault('port', 5269)))
+            
+            serv = None
+            for server in pjs.conf.conf.launcher.servers:
+                if isinstance(server, pjs.server.S2SServer):
+                    serv = server
+                    break
+            else:
+                logging.warning("[NewS2SConnHandler] Can't find an S2SServer in launcher")
+                return
+            
+            sOutConn = serv.createOutConnection(sock)
+            #sOutConn = ServerOutConnection(sock, sock.getsockname(), pjs.conf.conf.launcher)
+            
+            # copy over any queued messages to send once fully connected
+            sOutConn.outQueue.extend(d['new-s2s-conn'].setdefault('queue', []))
+            
+            # register the connection with the S2S server
+            serv.s2sConns.setdefault(d['new-s2s-conn']['hostname'], [None, None])[1] = sOutConn
+            
+            # send the initial stream
+            sOutConn.send(u"<?xml version='1.0'?>" +\
+                          "<stream:stream xmlns='jabber:server' " +\
+                          "xmlns:stream='http://etherx.jabber.org/streams' " +\
+                          "to='%s' " % d['new-s2s-conn']['hostname'] + \
+                          "version='1.0'>")
+        
+        def cb(workReq, retVal):
+            self.done = True
+            # we don't return anything, but make sure we pass the
+            # lastRetVal along
+            self.retVal = lastRetVal
+        
+        req = threadpool.makeRequests(act, None, cb)
+        
+        def checkFunc():
+            # need to poll manually or the callback's never called from the pool
+            poll(tpool)
+            return self.done
+        
+        def initFunc():
+            tpool.putRequest(req[0])
+            
+        return FunctionCall(checkFunc), FunctionCall(initFunc)
+    
+    def resume(self):
+        return self.retVal
 
 class StreamEndHandler(Handler):
     """Handler for closing the stream"""

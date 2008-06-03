@@ -11,13 +11,13 @@ corePhases = {
           'default' : {
                        'description' : 'default phase for when no other matches'
                        },
-          'stream-init' : {
+          'in-stream-init' : {
                            'description' : 'initializes stream data and sends out features',
-                           'handlers' : [h['stream-init'], h['features-init'], h['write']]
+                           'handlers' : [h['in-stream-init'], h['features-init'], h['write']]
                            },
-          'stream-reinit' : {
+          'in-stream-reinit' : {
                              'description' : 'new stream where one already exists',
-                             'handlers' : [h['stream-reinit']]
+                             'handlers' : [h['in-stream-reinit']]
                              },
           'stream-end' : {
                           'description' : 'stream ended by the other side',

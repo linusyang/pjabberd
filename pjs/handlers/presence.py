@@ -1,6 +1,5 @@
 import logging
 import pjs.threadpool as threadpool
-import pjs.conf.conf
 
 from pjs.handlers.base import ThreadedHandler, Handler, chainOutput, poll
 from pjs.elementtree.ElementTree import Element, SubElement
@@ -107,13 +106,18 @@ class SubscriptionHandler(ThreadedHandler):
                     group.text = groupName
                     item.append(group)
                     
-                msg.setNextHandler('roster-push')
-                
                 # stamp presence with 'from' JID (3921-8.2)
-                tree.set('from', jid)
+                tree[0].set('from', jid)
                 
                 # route the presence
-                pjs.conf.conf.router.route(tree, cjid)
+                msg.conn.server.launcher.router.route(msg, tree[0], cjid)
+                
+                # push the roster first, in case we have to create a new
+                # s2s connection
+                msg.setNextHandler('write')
+                msg.setNextHandler('roster-push')
+                
+                return chainOutput(lastRetVal, query)
                 
             elif type == 'subscribed':
                 pass

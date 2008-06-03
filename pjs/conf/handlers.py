@@ -18,12 +18,12 @@ handlers = {
                               'handler' : pjs.handlers.simple.SimpleReplyHandler,
                               'description' : 'sends a simple reply (non-XMPP)'
                               },
-            'stream-init' : {
-                             'handler' : pjs.handlers.stream.StreamInitHandler,
+            'in-stream-init' : {
+                             'handler' : pjs.handlers.stream.InStreamInitHandler,
                              'description' : 'initializes the stream'
                              },
-            'stream-reinit' : {
-                               'handler' : pjs.handlers.stream.StreamReInitHandler,
+            'in-stream-reinit' : {
+                               'handler' : pjs.handlers.stream.InStreamReInitHandler,
                                'description' : 'reinitializes the stream'
                                },
             'stream-end' : {
@@ -83,5 +83,9 @@ handlers = {
             'subscription' : {
                               'handler' : pjs.handlers.presence.SubscriptionHandler,
                               'description' : 'takes care of subscriptions'
+                              },
+            'new-s2s-conn' : {
+                              'handler' : pjs.handlers.stream.NewS2SConnHandler,
+                              'description' : 'creates a new S2S connection and sends initial stream'
                               }
             }

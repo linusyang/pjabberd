@@ -254,10 +254,6 @@ class RosterPushHandler(ThreadedHandler):
                 return
             
             id = tree[0].get('id')
-            if not id:
-                logging.warning('[%s] No id in roster get query. Tree: %s',
-                                self.__class__, tree[0])
-                return
             
             jid = msg.conn.data['user']['jid']
             resource = msg.conn.data['user']['resource']
@@ -279,11 +275,13 @@ class RosterPushHandler(ThreadedHandler):
                     con.send(tostring(iq))
                 
             # send an ack to client
-            iq = Element('iq', {
-                                'to' : '%s/%s' % (jid, resource),
-                                'type' : 'result',
-                                'id' : id
-                                })
+            d = {
+                 'to' : '%s/%s' % (jid, resource),
+                 'type' : 'result',
+                 }
+            if id: d['id'] = id
+            
+            iq = Element('iq', d)
             return chainOutput(lastRetVal, iq)
         
         def cb(workReq, retVal):

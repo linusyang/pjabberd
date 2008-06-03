@@ -6,36 +6,8 @@ import socket
 from pjs.elementtree.ElementTree import Element
 #from tlslite.integration.TLSAsyncDispatcherMixIn import TLSAsyncDispatcherMixIn
 
-def initData():
-    """Creates the default per-connection data"""
-    data = {}
-    data['stream'] = {
-                      'in-stream' : False, # False before <stream> sent and after </stream>
-                      'type' : 'c2s',
-                      'id' : '',
-                      }
-    data['sasl'] = {
-                    'mech' : 'DIGEST-MD5', # or PLAIN
-                    'mechObj' : None, # <reference to one of SASL mech objects>
-                    'complete' : False,
-                    }
-    data['tls'] = {
-                   'enabled' : False,
-                   'complete' : False,
-                   }
-    data['user'] = {
-                    'jid' : '',
-                    'resource' : '',
-                    'in-session' : False, # True if <session> sent/accepted
-                    'requestedRoster' : False, # True when sent the roster iq get
-                                               # when False, we shouldn't send it presence
-                                               # updates
-                    }
-    
-    return data
-
 class Connection(asyncore.dispatcher_with_send):
-    """Connection initiated by the other party"""
+    """Represents a connection between two endpoints"""
     def __init__(self, sock, addr, server):
         asyncore.dispatcher_with_send.__init__(self, sock)
         self.sock = sock
@@ -46,19 +18,26 @@ class Connection(asyncore.dispatcher_with_send):
         self.parser = parsers.borrow_parser(self)
         
         # per-connection data. can be accessed by handlers.
-        self.data = initData()
-        
-        logging.info("New connection accepted from %s", self.addr)
+        self.data = {}
+        self.data['stream'] = {
+                               'in-stream' : False, # False before <stream> sent and after </stream>
+                               'id' : '',
+                               }
+        self.data['sasl'] = {
+                             'mech' : 'DIGEST-MD5', # or PLAIN
+                             'mechObj' : None, # <reference to one of SASL mech objects>
+                             'complete' : False,
+                             }
+        self.data['tls'] = {
+                            'enabled' : False,
+                            'complete' : False,
+                            }
         
     def handle_expt(self):
         logging.warning("Socket exception occurred for %s", self.addr)
         self.handle_close()
     
     def handle_close(self):
-        # this resource is no longer connected
-        jid = self.data['user']['jid']
-        resource = self.data['user']['resource']
-        del self.server.data['resources'][jid][resource]
         del self.server.conns[self.id]
         
         try:
@@ -71,6 +50,81 @@ class Connection(asyncore.dispatcher_with_send):
     def handle_read(self):
         data = self.recv(4096)
         self.parser.feed(data)
+        
+class ClientConnection(Connection):
+    """A connection between a client and a server (us) initiated by
+    the client.
+    """
+    def __init__(self, sock, addr, server):
+        Connection.__init__(self, sock, addr, server)
+        
+        if server.data['info']['type'] != 'c2s':
+            raise Exception, "Trying to create a c2s connection with a non-c2s server"
+        
+        self.data['user'] = {
+                             'jid' : '',
+                             'resource' : '',
+                             'in-session' : False, # True if <session> sent/accepted
+                             'requestedRoster' : False, # True when sent the roster iq get
+                                                        # when False, we shouldn't send it presence
+                                                        # updates
+                             }
+        
+        logging.info("New c2s connection accepted from %s", self.addr)
+        
+    def handle_close(self):
+        # this resource is no longer connected
+        jid = self.data['user']['jid']
+        resource = self.data['user']['resource']
+        del self.server.data['resources'][jid][resource]
+        
+        Connection.handle_close(self)
+
+class ServerConnection(Connection):
+    """A connection between two servers"""
+    def __init__(self, sock, addr, server):
+        Connection.__init__(self, sock, addr, server)
+        
+        if server.data['info']['type'] != 's2s':
+            raise Exception, "Trying to create a s2s connection with a non-s2s server"
+        
+        self.data['server'] = {
+                               'hostname' : '',
+                               }
+        
+        logging.info("New s2s connection accepted from %s", self.addr)
+        
+class ServerInConnection(ServerConnection):
+    """An s2s connection to us from a remote server"""
+    def __init__(self, sock, addr, server):
+        ServerConnection.__init__(self, sock, addr, server)
+        
+        self.data['server']['direction'] = 'from'
+        
+    def handle_close(self):
+        hostname = self.data['server']['hostname']
+        if hostname:
+            self.server.s2sConns[hostname][0] = None
+        
+        Connection.handle_close(self)
+        
+class ServerOutConnection(ServerConnection):
+    """An s2s connection from us to a remote server"""
+    def __init__(self, sock, addr, server):
+        ServerConnection.__init__(self, sock, addr, server)
+        
+        self.data['server']['direction'] = 'to'
+        
+        # queue of messages to send to the remote server as soon as we are
+        # ready (ie. completed auth, tls, db, etc.)
+        self.outQueue = []
+        
+    def handle_close(self):
+        hostname = self.data['server']['hostname']
+        if hostname:
+            self.server.s2sConns[hostname][1] = None
+        
+        Connection.handle_close(self)
 
 class LocalTriggerConnection(asyncore.dispatcher_with_send):
     """This creates a local connection back to our server.

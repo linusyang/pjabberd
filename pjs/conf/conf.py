@@ -1,5 +1,4 @@
 # configuration parsing and other stuff should go here
 
-# this is modified by the Server when it is started
-server = None # one and only server
-router = None
+# this is modified by the Launcher when it is started
+launcher = None

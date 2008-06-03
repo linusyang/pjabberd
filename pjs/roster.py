@@ -211,7 +211,10 @@ class Roster:
                    FROM roster\
                        JOIN jids AS userjids ON roster.userid = userjids.id\
                        JOIN jids AS contactjids ON roster.contactid = contactjids.id\
-                   WHERE userjids.jid = ?", (self.jid,))
+                   WHERE userjids.jid = ? AND\
+                       roster.subscription IN (?, ?, ?)",
+                       (self.jid, Subscription.TO,
+                        Subscription.TO_PENDING_IN, Subscription.BOTH))
         
         self.items = {}
         for row in c:

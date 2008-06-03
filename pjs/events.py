@@ -199,6 +199,8 @@ def _runMessages():
         if not _runningMessages.has_key(connId):
             _runningMessages[connId] = msg
             msg.process()
+
+activeServers = pjs.conf.conf.launcher.servers
             
 def pickupResults():
     """Picks up any available results on the result queue and calls
@@ -206,12 +208,20 @@ def pickupResults():
     """
     try:
         connId, out = resultQ.get_nowait()
-        conn = pjs.conf.conf.server.conns[connId][1]
-        conn.send(prepareDataForSending(out))
+        for server in activeServers:
+            if server.conns.has_key(connId):
+                conn = server.conns[connId][1]
+                conn.send(prepareDataForSending(out))
+                break
+        else:
+            # message left on the queue for a connection that's no longer
+            # there, so we log it and move on
+            logging.warning("[events] Connection id %d has no corresponding" +\
+                            " Connection object. Dropping result from queue.", connId)
         del _runningMessages[connId]
     except Empty:
         pass
-    
+        
     _runMessages()
     
 class _Dispatcher(object):
