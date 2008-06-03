@@ -70,24 +70,4 @@ class Router:
             
             msg.setNextHandler('new-s2s-conn')
         
-#        if jid.domain == self.hostname:
-#            
-#            if jid.resource:
-#                # locate the resource of this JID
-#                def f(i):
-#                    return self.conns[i][0] == jid
-#            else:
-#                # locate all active resources of this JID
-#                def f(i):
-#                    jidConn = self.conns[i]
-#                    if not jidConn[0]: return False
-#                    return jidConn[0].node == jid.node and jidConn[0].domain == jid.domain
-#                
-#            activeJids = filter(f, self.conns)
-#            for con in activeJids:
-#                con[1].send(prepareDataForSending(data))
-#        else:
-#            # TODO: implement S2S
-#            pass
-        
         return True
