@@ -47,7 +47,7 @@ you - by calling your self.found_terminator() method.
 """
 
 import socket
-import asyncore
+import pjs.async.asyncore as asyncore
 from collections import deque
 
 class async_chat (asyncore.dispatcher):
