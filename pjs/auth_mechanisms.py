@@ -2,7 +2,7 @@ import binascii
 import base64
 import re
 
-from pjs.db import DB
+from pjs.db import DBautocommit
 from pjs.utils import generateId
 from pjs.elementtree.ElementTree import Element
 from pjs.jid import JID
@@ -86,15 +86,18 @@ class SASLPlain:
             if len(auth) != 3:
                 raise SASLIncorrectEncodingError
             
-            c = DB().cursor()
+            con = DBautocommit()
+            c = con.cursor()
             c.execute("SELECT * FROM jids WHERE \
                 jid = ? AND password = ?", (auth[1] + \
                                             '@' + self.msg.conn.server.hostname, auth[2]))
             res = c.fetchall()
             if len(res) == 0:
                 c.close()
+                con.close()
                 raise SASLAuthError
             c.close()
+            con.close()
         
         self.msg.conn.data['sasl']['complete'] = True
         self.msg.conn.data['sasl']['in-progress'] = False
@@ -198,7 +201,8 @@ class SASLDigestMD5:
                 raise SASLAuthError
             
             # fetch the password now
-            c = DB().cursor()
+            con = DBautocommit()
+            c = con.cursor()
             c.execute("SELECT password FROM jids WHERE \
                 jid = ?", (username + '@%s' % self.msg.conn.server.hostname,))
             for row in c:
@@ -207,8 +211,10 @@ class SASLDigestMD5:
             else:
                 self._handleFailure()
                 c.close()
+                con.close()
                 raise SASLAuthError
             c.close()
+            con.close()
             
             # compute the digest as per RFC 2831
             a1 = "%s:%s:%s" % (H("%s:%s:%s" % (username, realm, password)),
@@ -326,7 +332,8 @@ class IQAuthPlain:
         self.msg = msg
         
     def handle(self, username, password):
-        c = DB().cursor()
+        con = DBautocommit()
+        c = con.cursor()
         c.execute("SELECT password FROM jids WHERE \
             jid = ?", (username + '@%s' % self.msg.conn.server.hostname,))
         res = c.fetchone()
@@ -334,8 +341,10 @@ class IQAuthPlain:
             password = res[0]
         else:
             c.close()
+            con.close()
             raise IQAuthError
         c.close()
+        con.close()
         
         d = self.msg.conn.data
         d['user'] = {
@@ -356,7 +365,8 @@ class IQAuthDigest:
         self.msg = msg
         self.streamid = msg.conn.data['stream']['id']
     def handle(self, username, digest):
-        c = DB().cursor()
+        con = DBautocommit()
+        c = con.cursor()
         c.execute("SELECT password FROM jids WHERE \
             jid = ?", (username + '@%s' % self.msg.conn.server.hostname,))
         res = c.fetchone()
@@ -364,8 +374,10 @@ class IQAuthDigest:
             password = res[0]
         else:
             c.close()
+            con.close()
             raise IQAuthError
         c.close()
+        con.close()
         
         s = sha1()
         s.update(self.streamid + password)

@@ -1,20 +1,24 @@
 import logging
 
 from pjs.elementtree.ElementTree import Element, SubElement
-from pjs.db import DB
+from pjs.db import DB, DBautocommit, commitSQLiteTransaction
 
 class Roster:
     def __init__(self, jid):
         self.items = {}
         self.jid = jid
         
-        c = DB().cursor()
+        con = DBautocommit()
+        c = con.cursor()
         # get our own id
         c.execute("SELECT id FROM jids WHERE jid = ?", (self.jid,))
         res = c.fetchone()
         if res is None:
+            c.close()
             raise Exception, "No record of this JID in the DB"
         
+        c.close()
+        con.close()
         self.uid = res[0]
         
     def addItem(self, contactId, rosterItem):
@@ -36,7 +40,8 @@ class Roster:
         False otherwise.
         If includeGroups is True, groups are added to the RosterItem as well.
         """
-        c = DB().cursor()
+        con = DBautocommit()
+        c = con.cursor()
         
         c.execute("SELECT roster.contactid, roster.name, roster.subscription\
                    FROM roster\
@@ -49,7 +54,10 @@ class Roster:
             sub = res[2]
         else:
             c.close()
+            con.close()
             return False
+        
+        c.close()
         
         if includeGroups:
             # get the groups
@@ -58,9 +66,14 @@ class Roster:
                            JOIN rostergroupitems AS rgi ON rgi.groupid = rgs.groupid\
                        WHERE rgs.userid = ? AND rgi.contactid = ?", (self.uid, cid))
             groups = [group['name'] for group in c]
-                
+            
+            c.close()
+            con.close()
+            
             return RosterItem(cjid, name, sub, groups, cid)
         else:
+            con.close()
+            
             return RosterItem(cjid, name, sub, id=cid)
     
     def updateContact(self, cjid, groups=None, name=None, subscriptionId=None):
@@ -149,16 +162,7 @@ class Roster:
                        VALUES\
                        (?, ?)", (gid, cid))
         
-        try:
-            con.commit()
-        except Exception, e:
-            try:
-                con.rollback()
-            except: pass
-            c.close()
-            raise e
-        else:
-            c.close()
+        commitSQLiteTransaction(con, c)
             
         return cid
     
@@ -180,6 +184,7 @@ class Roster:
         else:
             logging.info("[%s] Contact %s does not exist in roster of %s",
                          self.__class__, cjid, self.jid)
+            commitSQLiteTransaction(con, c)
             return
         
         # delete the contact from all groups it's in for this user
@@ -194,30 +199,26 @@ class Roster:
         c.execute("DELETE FROM roster\
                    WHERE userid = ? AND contactid = ?", (self.uid, cid))
         
-        try:
-            con.commit()
-        except Exception, e:
-            try:
-                con.rollback()
-            except: pass
-            c.close()
-            raise e
-        else:
-            c.close()
+        commitSQLiteTransaction(con, c)
         
         return cid
         
     def getSubscription(self, cid):
         """Returns the subscription id of this user's contact with id cid"""
-        c = DB().cursor()
+        con = DBautocommit()
+        c = con.cursor()
         c.execute("SELECT subscription FROM roster\
                    WHERE userid = ? AND contactid = ?", (self.uid, cid))
         res = c.fetchone()
         if res:
             sub = res[0]
+            
             c.close()
+            con.close()
             return sub
         else:
+            c.close()
+            con.close()
             raise Exception, "No such contact in roster"
     
     def setSubscription(self, cid, sub):
@@ -229,23 +230,15 @@ class Roster:
         c = con.cursor()
         c.execute("UPDATE roster SET subscription = ?\
                    WHERE userid = ? AND contactid = ?", (sub, self.uid, cid))
-        try:
-            con.commit()
-        except Exception, e:
-            try:
-                con.rollback()
-            except: pass
-            c.close()
-            raise e
-        else:
-            c.close()
+        commitSQLiteTransaction(con, c)
     
     def getSubPrimaryName(self, cid):
         """Gets the primary name of a subscription for this user and this
         contact suitable for including in the subscription attribute of a
         roster's item element.
         """
-        c = DB().cursor()
+        con = DBautocommit()
+        c = con.cursor()
         c.execute("SELECT subscription FROM roster\
                        WHERE roster.userid = ? AND roster.contactid = ?", (self.uid, cid))
         res = c.fetchone()
@@ -255,6 +248,7 @@ class Roster:
             sub = Subscription.getPrimaryNameFromState(res[0])
             
         c.close()
+        con.close()
         
         return sub
     
@@ -262,7 +256,8 @@ class Roster:
         """Returns a list of JIDs of contacts of this user who are interested
         in the user's presence info.
         """
-        c = DB().cursor()
+        con = DBautocommit()
+        c = con.cursor()
         c.execute("SELECT jids.jid\
                    FROM roster\
                    JOIN jids ON jids.id = roster.contactid\
@@ -276,6 +271,7 @@ class Roster:
             jids.append(row[0])
             
         c.close()
+        con.close()
         
         return jids
     
@@ -283,7 +279,8 @@ class Roster:
         """Loads the roster for this JID. Must be used before calling
         getAsTree().
         """
-        c = DB().cursor()
+        con = DB()
+        c = con.cursor()
         # get the contactid, name and subscriptions
         c.execute("SELECT roster.contactid, roster.name,\
                           roster.subscription,\
@@ -309,6 +306,8 @@ class Roster:
         
         for row in c:
             self.addGroup(row['contactid'], row['name'])
+            
+        commitSQLiteTransaction(con, c)
             
         c.close()
     

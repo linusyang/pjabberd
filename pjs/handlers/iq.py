@@ -2,10 +2,9 @@ import logging
 import pjs.threadpool as threadpool
 
 from pjs.handlers.base import ThreadedHandler, Handler, chainOutput, poll
-from pjs.roster import Roster, RosterItem
+from pjs.roster import Roster
 from pjs.elementtree.ElementTree import Element, SubElement
 from pjs.utils import tostring, generateId, FunctionCall
-from pjs.db import DB
 from copy import deepcopy
 
 def bindResource(msg, resource):
