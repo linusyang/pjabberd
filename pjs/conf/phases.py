@@ -40,11 +40,16 @@ phases = {
                           'handlers' : [],
                           'errorHandlers' : [h['sasl-error']]
                           },
-          'iq' : {
-                  'description' : 'incoming IQ stanza',
-                  'xpath' : '{jabber:client}iq',
-                  'handlers' : [h['iq-not-implemented'], h['write']]
-                  },
+#          'iq' : {
+#                  'description' : 'incoming IQ stanza',
+#                  'xpath' : '{jabber:client}iq',
+#                  'handlers' : [h['iq-not-implemented'], h['write']]
+#                  },
+          'iq-bind' : {
+                       'description' : 'client binding a resource',
+                       'xpath' : "{jabber:client}iq[@type='set']/{urn:ietf:params:xml:ns:xmpp-bind}bind",
+                       'handlers' : [h['iq-bind'], h['write']]
+                       },
           'message' : {
                        'description' : 'incoming message stanza',
                        'xpath' : '{jabber:client}message',

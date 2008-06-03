@@ -1,6 +1,35 @@
 from pjs.handlers.base import Handler
 from pjs.elementtree.ElementTree import Element, SubElement
-from pjs.utils import tostring
+from pjs.utils import tostring, generateId
+
+class IQBindHandler(Handler):
+    """Handles resource binding"""
+    def handle(self, tree, msg, lastRetVal=None):
+        iq = tree[0]
+        id = iq.get('id')
+        if id:
+            bind = iq[0]
+            if len(bind) > 0:
+                # accept id
+                # TODO: check if id is available
+                resource = bind[0].text
+            else:
+                # generate an id
+                resource = generateId()
+            
+            msg.conn.data['user']['resource'] = resource
+                
+            res = Element('iq', {'type' : 'result', 'id' : id})
+            bind = Element('bind', {'xmlns' : 'urn:ietf:params:xml:ns:xmpp-bind'})
+            jid = Element('jid')
+            jid.text = '%s/%s' % (msg.conn.data['user']['jid'], resource)
+            bind.append(jid)
+            res.append(bind)
+            
+            return tostring(res)
+        else:
+            # log it?
+            pass
 
 class IQNotImplementedHandler(Handler):
     """Handler that replies to unknown iq stanzas"""

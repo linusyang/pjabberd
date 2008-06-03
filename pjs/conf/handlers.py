@@ -49,5 +49,9 @@ handlers = {
                             'handler' : pjs.handlers.sasl.SASLErrorHandler,
                             'description' : 'handles SASLErrors and responds with '+\
                                             'appropriate failure element'
-                            }
+                            },
+            'iq-bind' : {
+                         'handler' : pjs.handlers.iq.IQBindHandler,
+                         'description' : 'handles resource binding'
+                         }
             }

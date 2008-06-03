@@ -71,16 +71,20 @@ class SASLAuthHandler(Handler):
                 res = c.fetchall()
                 if len(res) == 0:
                     raise SASLAuthError
-                else:
-                    msg.conn.data['sasl']['complete'] = True
-                    msg.addTextOutput(u"<success xmlns='urn:ietf:params:xml:ns:xmpp-sasl'/>")
-                    msg.conn.parser.resetParser()
         elif mech == 'DIGEST-MD5':
             # TODO: implement digest
             msg.conn.data['sasl']['mech'] = 'DIGEST-MD5'
         else:
             # log it
             return
+        
+        msg.conn.data['sasl']['complete'] = True
+        msg.conn.data['user'] = {
+                                 'jid' : '%s@%s' % (auth[1], msg.conn.server.hostname),
+                                 'resource' : ''
+                                 }
+        msg.addTextOutput(u"<success xmlns='urn:ietf:params:xml:ns:xmpp-sasl'/>")
+        msg.conn.parser.resetParser()
         
 class SASLErrorHandler(Handler):
     def handle(self, tree, msg, lastRetVal=None):
