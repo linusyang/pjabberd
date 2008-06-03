@@ -11,7 +11,7 @@ from copy import deepcopy
 class IQBindHandler(Handler):
     """Handles resource binding"""
     def handle(self, tree, msg, lastRetVal=None):
-        iq = tree[0]
+        iq = tree
         id = iq.get('id')
         if id:
             bind = iq[0]
@@ -57,7 +57,7 @@ class IQSessionHandler(Handler):
         res = Element('iq', {
                              'from' : msg.conn.server.hostname,
                              'type' : 'result',
-                             'id' : tree[0].get('id')
+                             'id' : tree.get('id')
                              })
         
         msg.conn.data['user']['in-session'] = True
@@ -84,10 +84,10 @@ class IQRosterGetHandler(ThreadedHandler):
             # TODO: verify that it's coming from a known user
             jid = msg.conn.data['user']['jid']
             resource = msg.conn.data['user']['resource']
-            id = tree[0].get('id')
+            id = tree.get('id')
             if id is None:
                 logging.warning('[%s] No id in roster get query. Tree: %s',
-                                self.__class__, tree[0])
+                                self.__class__, tree)
                 # TODO: throw exception here
                 return
             
@@ -146,29 +146,29 @@ class IQRosterUpdateHandler(ThreadedHandler):
         def act():
             # TODO: verify that it's coming from a known user
             jid = msg.conn.data['user']['jid']
-            id = tree[0].get('id')
+            id = tree.get('id')
             if id is None:
                 logging.warning('[%s] No id in roster get query. Tree: %s',
-                                self.__class__, tree[0])
+                                self.__class__, tree)
                 # TODO: throw exception here
                 return
             
             # RFC 3921 says in section 7.4 "an item", so we only handle the
             # first <item>
-            item = tree[0][0][0] # iq -> query -> item
+            item = tree[0][0] # iq -> query -> item
             cjid = item.get('jid')
             name = item.get('name')
             if cjid is None:
                 logging.warning("[%s] Client trying to add a roster item " + \
                                 "without a jid. Tree: %s",
-                                self.__class__, tree[0])
+                                self.__class__, tree)
                 # TODO: throw exception here
                 return
 
             roster = Roster(jid)
             
             xpath = './{jabber:iq:roster}query/{jabber:iq:roster}item[@subscription="remove"]'
-            if tree[0].find(xpath) is not None:
+            if tree.find(xpath) is not None:
                 # we're removing the roster item. See 3921 8.6
                 out = "<presence from='%s' to='%s' type='unsubscribe'/>" \
                                                           % (jid, cjid)
@@ -191,7 +191,7 @@ class IQRosterUpdateHandler(ThreadedHandler):
                      }
                 
                 roster.removeContact(cjid)
-                query = deepcopy(tree[0][0])
+                query = deepcopy(tree[0])
                 
                 retVal = chainOutput(lastRetVal, query)
 
@@ -318,9 +318,9 @@ class RosterPushHandler(ThreadedHandler):
                     
                     con.send(tostring(iq))
 
-            if tree[0].tag == '{jabber:client}iq' and tree[0].get('id'):
+            if tree.tag == '{jabber:client}iq' and tree.get('id'):
                 # send an ack to client if this is in reply to a roster get/set
-                id = tree[0].get('id')
+                id = tree.get('id')
                 d = {
                      'to' : '%s/%s' % (jid, resource),
                      'type' : 'result',
@@ -358,7 +358,7 @@ class IQNotImplementedHandler(Handler):
     def handle(self, tree, msg, lastRetVal=None):
         if len(tree) > 0:
             # get the original iq msg
-            origIQ = tree[0]
+            origIQ = tree
         else:
             logging.warning("[%s] Original <iq> missing:\n%s",
                             self.__class__, tostring(tree))

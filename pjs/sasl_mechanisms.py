@@ -232,10 +232,10 @@ class DigestMD5:
             else:
                 self._handleFailure()
                 raise SASLAuthError
-        elif self.state == DigestMD5.SENT_CHALLENGE2 and len(data):
+        elif self.state == DigestMD5.SENT_CHALLENGE2 and isinstance(data, Element):
             # expect to get <response xmlns='urn:ietf:params:xml:ns:xmpp-sasl'/>
-            resp = data.find('{urn:ietf:params:xml:ns:xmpp-sasl}response')
-            if resp is not None and len(resp) == 0:
+            respInd = data.tag.find('{urn:ietf:params:xml:ns:xmpp-sasl}response')
+            if respInd != -1 and len(data) == 0:
                 self.state = DigestMD5.INIT
                 msg.conn.data['sasl']['complete'] = True
                 msg.conn.data['user'] = {

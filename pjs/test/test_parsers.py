@@ -152,8 +152,8 @@ class TestParser(unittest.TestCase):
         self.p.feed("</jid></bind></iq>")
         self.assert_(self.p.depth == 1)
         self.assert_(self.p.tree.tag == '{jabber:client}iq')
-        self.assert_(self.p.tree[0].tag == '{urn:ietf:params:xml:ns:xmpp-bind}bind')
-        self.assert_(self.p.tree[0][0].text == u'somenode@example.com/someresource')
+        self.assert_(self.p.tree.tag == '{urn:ietf:params:xml:ns:xmpp-bind}bind')
+        self.assert_(self.p.tree[0].text == u'somenode@example.com/someresource')
 
     def testNamespacedXPath(self):
         """Should be able to refer to elements using namespaces in XPath"""

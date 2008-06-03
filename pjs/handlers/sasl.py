@@ -27,11 +27,11 @@ class SASLAuthHandler(ThreadedHandler):
         
         # the actual function executing in the thread
         def act():
-            mech = tree[0].get('mechanism')
+            mech = tree.get('mechanism')
             
             if mech == 'PLAIN':
                 msg.conn.data['sasl']['mech'] = 'PLAIN'
-                authtext64 = tree[0].text
+                authtext64 = tree.text
                 plain = mechs.Plain(msg)
                 msg.conn.data['sasl']['mechObj'] = plain
                 return chainOutput(lastRetVal, plain.handle(authtext64))
@@ -91,7 +91,7 @@ class SASLResponseHandler(ThreadedHandler):
                 logging.debug("[%s] %s", self.__class__, msg.conn.data)
                 return
     
-            text = tree[0].text
+            text = tree.text
             if text:
                 return chainOutput(lastRetVal, mech.handle(msg, text.strip()))
             else:

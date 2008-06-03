@@ -26,7 +26,7 @@ class C2SPresenceHandler(ThreadedHandler):
             jid = msg.conn.data['user']['jid']
             resource = msg.conn.data['user']['resource']
             
-            presTree = deepcopy(tree[0])
+            presTree = deepcopy(tree)
             presTree.set('from', '%s/%s' % (jid, resource))
             
             # lookup contacts interested in presence
@@ -82,10 +82,10 @@ class S2SPresenceHandler(Handler):
             data.set('to', '%s/%s' % (jid, res))
             return data
         
-        logging.debug("[%s] Routing %s", self.__class__, tostring(tree[0]))
+        logging.debug("[%s] Routing %s", self.__class__, tostring(tree))
         d = {
-             'to' : tree[0].get('to'),
-             'data' : tree[0],
+             'to' : tree.get('to'),
+             'data' : tree,
              'preprocessingFunc' : rewriteTo
              }
         msg.setNextHandler('route-client')
@@ -109,21 +109,21 @@ class S2SSubscriptionHandler(ThreadedHandler):
         
         def act():
             # get the contact's jid
-            fromAddr = tree[0].get('from')
+            fromAddr = tree.get('from')
             try:
                 cjid = JID(fromAddr)
             except Exception, e:
                 logging.warning("[%s] 'from' JID is not properly formatted. Tree: %s",
-                                self.__class__, tostring(tree[0]))
+                                self.__class__, tostring(tree))
                 return
             
             # get the user's jid
-            toAddr = tree[0].get('to')
+            toAddr = tree.get('to')
             try:
                 jid = JID(toAddr)
             except Exception, e:
                 logging.warning("[%s] 'to' JID is not properly formatted. Tree: %s",
-                                self.__class__, tostring(tree[0]))
+                                self.__class__, tostring(tree))
                 return
             
             roster = Roster(jid.getBare())
@@ -131,7 +131,7 @@ class S2SSubscriptionHandler(ThreadedHandler):
             doRoute = False
 
             cinfo = roster.getContactInfo(cjid.getBare())
-            subType = tree[0].get('type')
+            subType = tree.get('type')
             
             retVal = lastRetVal
 
@@ -176,7 +176,7 @@ class S2SSubscriptionHandler(ThreadedHandler):
                     # queue the stanza for delivery
                     stanzaRouting = {
                                      'to' : jid,
-                                     'data' : tree[0]
+                                     'data' : tree
                                      }
                     retVal = chainOutput(retVal, stanzaRouting)
                     msg.setNextHandler('route-client')
@@ -206,7 +206,7 @@ class S2SSubscriptionHandler(ThreadedHandler):
                         # prepare the presence data for routing
                         d = {
                              'to' : jid,
-                             'data' : tree[0],
+                             'data' : tree,
                              }
                         retVal = chainOutput(retVal, d)
                             
@@ -282,7 +282,7 @@ class S2SSubscriptionHandler(ThreadedHandler):
                         # prepare the unsubscribe presence data for routing to client
                         unsubscribeRouting = {
                              'to' : jid,
-                             'data' : tree[0],
+                             'data' : tree,
                              }
                         retVal = chainOutput(retVal, unsubscribeRouting)
                         
@@ -339,7 +339,7 @@ class S2SSubscriptionHandler(ThreadedHandler):
                         # prepare the unsubscribed presence data for routing
                         d = {
                              'to' : jid,
-                             'data' : tree[0],
+                             'data' : tree,
                              }
                         retVal = chainOutput(retVal, d)
                         
@@ -405,12 +405,12 @@ class C2SSubscriptionHandler(ThreadedHandler):
         def act():
             # TODO: verify that it's coming from a known user
             jid = msg.conn.data['user']['jid']
-            cjid = JID(tree[0].get('to'))
-            type = tree[0].get('type')
+            cjid = JID(tree.get('to'))
+            type = tree.get('type')
             
             if not cjid:
                 logging.warning('[%s] No contact jid specified in subscription ' +\
-                                'query. Tree: %s', self.__class__, tree[0])
+                                'query. Tree: %s', self.__class__, tree)
                 # TODO: throw exception here
                 return
             
@@ -457,7 +457,7 @@ class C2SSubscriptionHandler(ThreadedHandler):
                             name, groups, {'ask' : 'subscribe'})
 
                 # stamp presence with 'from' JID
-                treeCopy = deepcopy(tree[0])
+                treeCopy = deepcopy(tree)
                 treeCopy.set('from', jid)
                 
                 # prepare the presence data for routing
@@ -503,7 +503,7 @@ class C2SSubscriptionHandler(ThreadedHandler):
                                     cinfo.name, cinfo.groups)
                             
                         # stamp presence with 'from'
-                        treeCopy = deepcopy(tree[0])
+                        treeCopy = deepcopy(tree)
                         treeCopy.set('from', jid)
                         
                         toRoute = tostring(treeCopy)
@@ -544,7 +544,7 @@ class C2SSubscriptionHandler(ThreadedHandler):
                     # we don't have this contact in our roster, but route the
                     # presence anyway
                     # stamp presence with 'from'
-                    treeCopy = deepcopy(tree[0])
+                    treeCopy = deepcopy(tree)
                     treeCopy.set('from', jid)
                     
                     # prepare the presence data for routing
@@ -579,7 +579,7 @@ class C2SSubscriptionHandler(ThreadedHandler):
                                 cinfo.name, cinfo.groups)
                     
                     # stamp presence with 'from'
-                    treeCopy = deepcopy(tree[0])
+                    treeCopy = deepcopy(tree)
                     treeCopy.set('from', jid)
                     
                     # prepare the presence data for routing
@@ -629,7 +629,7 @@ class C2SSubscriptionHandler(ThreadedHandler):
                                         cinfo.name, cinfo.groups, itemArgs)
                     
                         # stamp presence with 'from'
-                        treeCopy = deepcopy(tree[0])
+                        treeCopy = deepcopy(tree)
                         treeCopy.set('from', jid)
                         
                         toRoute = tostring(treeCopy)

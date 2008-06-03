@@ -298,8 +298,9 @@ class _Dispatcher(object):
                 errorHandlers = []
         else:
             return
-                
-        msg = Message(tree, conn, handlers, errorHandlers, phaseName)
+        
+        # we pass in tree[0] because tree is a wrapper element for XPath matches
+        msg = Message(tree[0], conn, handlers, errorHandlers, phaseName)
         
         if conn.id in _runningMessages:
             # already have a message being processed for this connection

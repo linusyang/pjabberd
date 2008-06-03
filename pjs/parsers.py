@@ -110,16 +110,23 @@ class IncrStreamParser:
             # we don't want to deal with changed namespaces or attributes
             # for now.
             if self.stream is not None:
-                Dispatcher().dispatch(self.stream, self.conn, 'in-stream-reinit')
+                # wrap here because the Dispatcher will do tree[0]
+                wrapperEl = et.Element('wrapper')
+                wrapperEl.append(self.stream)
+                Dispatcher().dispatch(wrapperEl, self.conn, 'in-stream-reinit')
                 return
             
             # handle <stream>, record it for XPath wrapping
             self.stream = et.Element(self._fixname(tag), attrs)
+            
+            # wrap here because the Dispatcher will do tree[0]
+            wrapperEl = et.Element('wrapper')
+            wrapperEl.append(self.stream)
             if 'id' in attrs:
                 # s2s connection
-                Dispatcher().dispatch(self.stream, self.conn, 'out-stream-init')
+                Dispatcher().dispatch(wrapperEl, self.conn, 'out-stream-init')
             else:
-                Dispatcher().dispatch(self.stream, self.conn, 'in-stream-init')
+                Dispatcher().dispatch(wrapperEl, self.conn, 'in-stream-init')
         elif self.depth == 2:
             # handle stanzas, build tree
             self.tree = et.TreeBuilder()
@@ -138,7 +145,9 @@ class IncrStreamParser:
         assert(self.depth >= 0)
         
         if self.depth == 0:
-            Dispatcher().dispatch(self.tree, self.conn, 'stream-end')
+            wrapperEl = et.Element('wrapper')
+            wrapperEl.append(self.stream)
+            Dispatcher().dispatch(wrapperEl, self.conn, 'stream-end')
             self.resetStream()
             self.resetParser()
         elif self.depth == 1:
