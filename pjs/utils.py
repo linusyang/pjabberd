@@ -1,5 +1,11 @@
-# This is used in pjs.async.asyncore. It's ugly and should probably be
-# replaced some day.
+from random import random
+try:
+    # python >= 2.5
+    from hashlib import sha1
+except ImportError:
+    from sha import new as sha1
+
+# This is used in pjs.async.asyncore.
 class FunctionCall:
     """Creates a simple object that represents the information required for a
     function call. Its main feature is that it is hashable, so it can be used
@@ -23,3 +29,7 @@ class FunctionCall:
         
     def __hash__(self):
         return self.hash
+    
+
+def generateId():
+    return sha1(str((random(), random(), random()))).hexdigest()

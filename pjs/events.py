@@ -125,6 +125,7 @@ class _Dispatcher(object):
                     phaseName = p
 
         # handlers get instantiated and loaded up into lists
+        # TODO: watch for errors during instantiation
         if phase.has_key('handlers'):
             handlers = [item['handler']() for item in phase['handlers']]
             if phase.has_key('errorHandlers'):
