@@ -88,7 +88,7 @@ if __name__ == '__main__':
         c.execute("CREATE TABLE roster (userid INTEGER REFERENCES jids NOT NULL,\
                                         contactid INTEGER REFERENCES jids NOT NULL,\
                                         name TEXT,\
-                                        subscription INTEGER REFERENCES substates DEFAULT 0 NOT NULL,\
+                                        subscription INTEGER DEFAULT 0,\
                                         PRIMARY KEY (userid, contactid)\
                                         )")
         c.execute("CREATE TABLE rostergroups (groupid INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,\
@@ -100,20 +100,8 @@ if __name__ == '__main__':
                     (groupid INTEGER REFERENCES rostergroup NOT NULL,\
                      contactid INTEGER REFERENCES jids NOT NULL,\
                      PRIMARY KEY (groupid, contactid))")
-        c.execute("CREATE TABLE substates (stateid INTEGER PRIMARY KEY NOT NULL,\
-                                           name TEXT NOT NULL,\
-                                           primaryname TEXT NOT NULL)")
         c.execute("INSERT INTO jids (jid, password) VALUES ('tro@localhost', 'test')")
         c.execute("INSERT INTO jids (jid, password) VALUES ('dv@localhost', 'test')")
-        c.execute("INSERT INTO substates (stateid, name, primaryName) VALUES (0, 'None', 'none')")
-        c.execute("INSERT INTO substates (stateid, name, primaryName) VALUES (1, 'None + Pending Out', 'none')")
-        c.execute("INSERT INTO substates (stateid, name, primaryName) VALUES (2, 'None + Pending In', 'none')")
-        c.execute("INSERT INTO substates (stateid, name, primaryName) VALUES (3, 'None + Pending Out/In', 'none')")
-        c.execute("INSERT INTO substates (stateid, name, primaryName) VALUES (4, 'To', 'to')")
-        c.execute("INSERT INTO substates (stateid, name, primaryName) VALUES (5, 'To + Pending In', 'to')")
-        c.execute("INSERT INTO substates (stateid, name, primaryName) VALUES (6, 'From', 'from')")
-        c.execute("INSERT INTO substates (stateid, name, primaryName) VALUES (7, 'From + Pending Out', 'from')")
-        c.execute("INSERT INTO substates (stateid, name, primaryName) VALUES (8, 'Both', 'both');")
         c.execute("INSERT INTO roster (userid, contactid, subscription) VALUES (1, 2, 8)")
         c.execute("INSERT INTO roster (userid, contactid, subscription) VALUES (2, 1, 8)")
         c.execute("INSERT INTO rostergroups (userid, name) VALUES (1, 'friends')")

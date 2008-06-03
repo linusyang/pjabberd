@@ -68,7 +68,7 @@ class Roster:
             c.execute("INSERT INTO roster\
                        (userid, contactid, name, subscription)\
                        VALUES\
-                       (?, ?, ?, ?)", (self.uid, cid, name or '', 0))
+                       (?, ?, ?, ?)", (self.uid, cid, name or '', Subscription.NONE))
                 
                 
         # UPDATE GROUPS
@@ -131,6 +131,8 @@ class Roster:
         c.execute("DELETE FROM roster\
                    WHERE userid = ? AND contactid = ?", (self.uid, cid))
         
+        c.close()
+        
         return cid
         
     
@@ -140,14 +142,13 @@ class Roster:
         roster's item element.
         """
         c = DB().cursor()
-        c.execute("SELECT primaryname FROM substates\
-                       JOIN roster on roster.subscription = substates.stateid\
+        c.execute("SELECT subscription FROM roster\
                        WHERE roster.userid = ? AND roster.contactid = ?", (self.uid, cid))
         res = c.fetchone()
         if res is None:
             sub = 'none'
         else:
-            sub = res[0]
+            sub = Subscription.getPrimaryNameFromState(res[0])
             
         c.close()
         
@@ -158,16 +159,17 @@ class Roster:
         c = DB().cursor()
         # get the contactid, name and subscriptions
         c.execute("SELECT roster.contactid, roster.name,\
-                          substates.primaryName subscription,\
+                          roster.subscription,\
                           contactjids.jid cjid\
                    FROM roster\
                        JOIN jids AS userjids ON roster.userid = userjids.id\
                        JOIN jids AS contactjids ON roster.contactid = contactjids.id\
-                       JOIN substates ON substates.stateid = roster.subscription\
                    WHERE userjids.jid = ?", (self.jid,))
         
         for row in c:
-            self.addItem(row['contactid'], RosterItem(row['cjid'], row['name'], row['subscription']))
+            self.addItem(row['contactid'],
+                         RosterItem(row['cjid'], row['name'],
+                                    Subscription.getPrimaryNameFromState(row['subscription'])))
         
         # get the groups now for each cid
         c.execute("SELECT rgi.contactid, rgs.name\
@@ -209,3 +211,35 @@ class RosterItem:
             SubElement(item, 'group').text = group
             
         return item
+
+class Subscription(object):
+    """Defines a subscription state. Provides static methods to determine the
+    primary name from the stateid.
+    """
+    
+    NONE = 0
+    NONE_PENDING_OUT = 1
+    NONE_PENDING_IN = 2
+    NONE_PENDING_IN_OUT = 3
+    TO = 4
+    TO_PENDING_IN = 5
+    FROM = 6
+    FROM_PENDING_OUT = 7
+    BOTH = 8
+    
+    state2primaryName = {
+                         NONE : 'none',
+                         NONE_PENDING_OUT : 'none',
+                         NONE_PENDING_IN : 'none',
+                         NONE_PENDING_IN_OUT : 'none',
+                         TO : 'to',
+                         TO_PENDING_IN : 'to',
+                         FROM : 'from',
+                         FROM_PENDING_OUT : 'from',
+                         BOTH : 'both'
+                         }
+    
+    def getPrimaryNameFromState(st):
+        return Subscription.state2primaryName[st]
+    
+    getPrimaryNameFromState = staticmethod(getPrimaryNameFromState)
