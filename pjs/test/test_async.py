@@ -1,4 +1,4 @@
-import pjs.async.asyncore as asyncore
+import pjs.async.core as asyncore
 from pjs.utils import FunctionCall
 
 import unittest
