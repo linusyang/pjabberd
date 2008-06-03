@@ -63,8 +63,15 @@ class C2SPresenceHandler(ThreadedHandler):
 class S2SPresenceHandler(Handler):
     """Handles plain <presence> (without type) sent by the servers"""
     def handle(self, tree, msg, lastRetVal=None):
-        # just forward it for now
-        msg.conn.server.launcher.router.routeToClient(msg, tree[0], tree[0].get('to'))
+        # we need to rewrite the "to" attribute of the <presence>
+        # stanza for each resource of the user we send it to
+        def rewriteTo(data, conn):
+            jid = conn.data['user']['jid']
+            res = conn.data['user']['resource']
+            data.set('to', '%s/%s' % (jid, res))
+            return data
+        
+        msg.conn.server.launcher.router.routeToClient(msg, tree[0], tree[0].get('to'), rewriteTo)
     
 class S2SSubscriptionHandler(ThreadedHandler):
     """Handles subscriptions sent from servers within <presence> stanzas.
@@ -132,16 +139,49 @@ class S2SSubscriptionHandler(ThreadedHandler):
                     # TODO: auto-reply with "subscribed" stanza
                     pass
                 # ignore presence in other states
+                
+                if doRoute:
+                    # deliver the stanza
+                    msg.conn.server.launcher.router.routeToClient(msg, tree[0], jid)
             elif subType == 'subscribed':
-                pass
+                if cinfo:
+                    subscription = cinfo.subscription
+                    if cinfo.subscription in (Subscription.NONE_PENDING_OUT,
+                                              Subscription.NONE_PENDING_IN_OUT,
+                                              Subscription.FROM_PENDING_OUT):
+                        # change state
+                        if cinfo.subscription == Subscription.NONE_PENDING_OUT:
+                            roster.updateContact(cjid.getBare(), None, None, Subscription.TO)
+                            subscription = Subscription.TO
+                        elif cinfo.subscription == Subscription.NONE_PENDING_IN_OUT:
+                            roster.updateContact(cjid.getBare(), None, None, Subscription.TO_PENDING_IN)
+                            subscription = Subscription.TO_PENDING_IN
+                        elif cinfo.subscription == Subscription.FROM_PENDING_OUT:
+                            roster.updateContact(cjid.getBare(), None, None, Subscription.BOTH)
+                            subscription = Subscription.BOTH
+                        
+                        # forward the subscribed presence
+                        msg.conn.server.launcher.router.routeToClient(msg, tree[0], jid)
+                            
+                        # create an updated roster item for roster push
+                        query = Roster.createRosterQuery(cinfo.jid,
+                                    Subscription.getPrimaryNameFromState(subscription),
+                                    cinfo.name, cinfo.groups)
+                        
+                        routeData = {}
+                        conns = msg.conn.server.launcher.getC2SServer().data['resources']
+                        bareJID = jid.getBare()
+                        if conns.has_key(bareJID):
+                            routeData['jid'] = bareJID
+                            routeData['resources'] = conns[bareJID]
+                        msg.setNextHandler('roster-push')
+                        
+                        return chainOutput(lastRetVal, (routeData, query))
+                        
             elif subType == 'unsubscribe':
                 pass
             elif subType == 'unsubscribed':
                 pass
-            
-            if doRoute:
-                # deliver the stanza
-                msg.conn.server.launcher.router.routeToClient(msg, tree[0], jid)
             
         def cb(workReq, retVal):
             self.done = True
@@ -227,23 +267,11 @@ class C2SSubscriptionHandler(ThreadedHandler):
                     subscription = Subscription.FROM_PENDING_OUT
                 
                 # send a roster push with ask
-                query = Element('query', {'xmlns' : 'jabber:iq:roster'})
-                d = {
-                 'jid' : cjid.getBare(),
-                 'subscription' : Subscription.getPrimaryNameFromState(subscription),
-                 'ask' : 'subscribe'
-                 }
-                if name:
-                    d['name'] = name
-                    
-                item = SubElement(query, 'item', d)
-                
-                for groupName in groups:
-                    group = Element('group')
-                    group.text = groupName
-                    item.append(group)
-                    
-                # stamp presence with 'from' JID (3921-8.2)
+                query = Roster.createRosterQuery(cjid.getBare(),
+                            Subscription.getPrimaryNameFromState(subscription),
+                            name, groups, {'ask' : 'subscribe'})
+
+                # stamp presence with 'from' JID
                 treeCopy = deepcopy(tree[0])
                 treeCopy.set('from', jid)
                 
@@ -270,7 +298,7 @@ class C2SSubscriptionHandler(ThreadedHandler):
                         if cinfo.subscription == Subscription.NONE_PENDING_IN:
                             roster.setSubscription(cinfo.id, Subscription.FROM)
                             subscription = Subscription.FROM
-                        elif cinfo.subscription == Subscription.FROM_PENDING_OUT:
+                        elif cinfo.subscription == Subscription.NONE_PENDING_IN_OUT:
                             roster.setSubscription(cinfo.id, Subscription.FROM_PENDING_OUT)
                             subscription = Subscription.FROM_PENDING_OUT
                         elif cinfo.subscription == Subscription.TO_PENDING_IN:
@@ -278,21 +306,9 @@ class C2SSubscriptionHandler(ThreadedHandler):
                             subscription = Subscription.BOTH
                             
                         # roster stanza
-                        query = Element('query' , {'xmlns' : 'jabber:iq:roster'})
-                        d = {
-                             'jid' : cjid.getBare(),
-                             'subscription' : Subscription.getPrimaryNameFromState(subscription)
-                             }
-                        if cinfo.name:
-                            d['name'] = cinfo.name
-                            
-                        item = SubElement(query, 'item', d)
-                        
-                        groups = cinfo.groups
-                        for groupName in groups:
-                            group = Element('group')
-                            group.text = groupName
-                            item.append(group)
+                        query = Roster.createRosterQuery(cjid.getBare(),
+                                    Subscription.getPrimaryNameFromState(subscription),
+                                    cinfo.name, cinfo.groups)
                             
                         # stamp presence with 'from'
                         treeCopy = deepcopy(tree[0])

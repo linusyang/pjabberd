@@ -174,7 +174,7 @@ class IQRosterUpdateHandler(ThreadedHandler):
             
             # we're updating/adding the roster item
             
-            groups = list(item.findall('{jabber:iq:roster}group'))
+            groups = [i.text for i in list(item.findall('{jabber:iq:roster}group'))]
             
             cid = roster.updateContact(cjid, groups, name)
             
@@ -182,21 +182,7 @@ class IQRosterUpdateHandler(ThreadedHandler):
             sub = roster.getSubPrimaryName(cid)
                 
             # prepare the result for roster push
-            query = Element('query', {'xmlns' : 'jabber:iq:roster'})
-            
-            d = {
-                 'jid' : cjid,
-                 'subscription' : sub,
-                 }
-            if name:
-                d['name'] = name
-                
-            item = SubElement(query, 'item', d)
-            
-            for groupName in groups:
-                group = Element('group')
-                group.text = groupName.text
-                item.append(group)
+            query = Roster.createRosterQuery(cjid, sub, name, groups)
                 
             msg.setNextHandler('roster-push')
                 
@@ -231,6 +217,12 @@ class RosterPushHandler(ThreadedHandler):
     change to all connected resources of the user. This handler needs to be
     scheduled from another handler and passed an Element tree of the updated
     roster to send with <query> as the initial element.
+    This works for both S2S and C2S servers. For S2S, pass in a tuple, where
+    the first element is the routeData and the second is the <query> Element.
+    routeData should have this
+      routeData['jid'] -- jid of the user to whom the roster push is addressed
+      routeData['resources'] -- ref to the resource=>Connection
+                                dictionary from the c2s server for the user
     """
     def __init__(self):
         # this is true when the threaded handler returns
@@ -245,21 +237,46 @@ class RosterPushHandler(ThreadedHandler):
         
         def act():
             # we have to be passed a tree to work
-            if not isinstance(lastRetVal, list) \
-                or not isinstance(lastRetVal[-1], Element) \
-                or lastRetVal[-1].tag.find('query') == -1:
-                logging.warning('[%s] Got a non-query Element last return value' +\
+            # or a tuple with routingData and a tree
+            if not isinstance(lastRetVal, list):
+                logging.warning('lastRetVal is not a list')
+                return
+            if isinstance(lastRetVal[-1], Element):
+                if lastRetVal[-1].tag.find('query') == -1:
+                    logging.warning('[%s] Got a non-query Element last return value' +\
                                 '. Last return value: %s',
                                 self.__class__, lastRetVal)
+            elif isinstance(lastRetVal[-1], tuple):
+                if not isinstance(lastRetVal[-1][0], dict) \
+                or not isinstance(lastRetVal[-1][1], Element):
+                    logging.warning('[%s] Got a non-query Element last return value' +\
+                                '. Last return value: %s',
+                                self.__class__, lastRetVal)
+                    return
+            else:
+                logging.warning('Roster push needs either a <query> Element ' +\
+                                'as the last item in lastRetVal or a tuple ' + \
+                                'with (routeData, query Element)')
                 return
             
-            jid = msg.conn.data['user']['jid']
-            resource = msg.conn.data['user']['resource']
-            
-            # this is the roster <query>
+            # this is the roster <query> that we'll send
+            # it could be a tuple if we got routing data as well
             query = lastRetVal.pop(-1)
+            routeData = None
             
-            resources = msg.conn.server.data['resources'][jid]
+            # did we get routing data (from S2S)
+            if isinstance(query, tuple):
+                routeData = query[0]
+                query = query[1]
+            
+            if routeData:
+                jid = routeData['jid']
+                resources = routeData['resources']
+            else:
+                jid = msg.conn.data['user']['jid']
+                resource = msg.conn.data['user']['resource']
+                resources = msg.conn.server.data['resources'][jid]
+                
             for res, con in resources.items():
                 # don't send the roster to clients that didn't request it
                 if con.data['user']['requestedRoster']:

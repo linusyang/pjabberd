@@ -24,7 +24,7 @@ class Router:
         """
         self.s2sConns = connMap
 
-    def routeToClient(self, msg, data, to=None):
+    def routeToClient(self, msg, data, to=None, preprocessFunc=None):
         """Routes 'data' to its recipient (client). 'To' should be either a
         string JID or a JID object. If 'to' is not specified, the relevant
         information is extracted from 'data'. If that fails, the method
@@ -54,7 +54,10 @@ class Router:
             
         activeJids = filter(f, conns)
         for con in activeJids:
-            conns[con][1].send(prepareDataForSending(data))
+            if callable(preprocessFunc):
+                conns[con][1].send(prepareDataForSending(preprocessFunc(data, conns[con][1])))
+            else:
+                conns[con][1].send(prepareDataForSending(data))
     
     def routeToServer(self, msg, data, to=None):
         """Routes 'data' to its recipient. 'To' should be either a string JID

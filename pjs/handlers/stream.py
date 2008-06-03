@@ -37,7 +37,9 @@ class InStreamInitHandler(Handler):
         
         # no one should need to modify this, so we don't pass it along
         # to the next handler, but just add it to the socket write queue
-        msg.addTextOutput(u"<?xml version='1.0' encoding='UTF-8'?>" + \
+        # commenting this out for now as it causes expat problems
+        #msg.addTextOutput(u"<?xml version='1.0'?>" + \
+        msg.addTextOutput(
                 "<stream:stream from='%s' id='%s' xmlns='%s' "  \
                     % (msg.conn.server.hostname, id, ns) + \
                 "xmlns:stream='http://etherx.jabber.org/streams' " + \
@@ -161,7 +163,8 @@ class NewS2SConnHandler(ThreadedHandler):
             serv.s2sConns.setdefault(d['new-s2s-conn']['hostname'], [None, None])[1] = sOutConn
             
             # send the initial stream
-            sOutConn.send("<?xml version='1.0' ?>")
+            # commenting this out for now as it causes expat problems
+            #sOutConn.send("<?xml version='1.0' ?>")
             sOutConn.send("<stream:stream xmlns='jabber:server' " +\
                           "xmlns:stream='http://etherx.jabber.org/streams' " +\
                           "to='%s' " % d['new-s2s-conn']['hostname'] + \

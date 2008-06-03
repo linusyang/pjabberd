@@ -63,16 +63,16 @@ class Roster:
         else:
             return RosterItem(cjid, name, sub, id=cid)
     
-    def updateContact(self, cjid, groups, name=None, subscriptionId=None):
+    def updateContact(self, cjid, groups=None, name=None, subscriptionId=None):
         """Adds or updates a contact in this user's roster. Returns the
         contact's id in the DB.
         groups can be None, which means that all groups have been removed
-        or none need to be added.
+        or none need to be added. Otherwise, groups is a list of groups the
+        contact belongs to.
         """
         
         name = name or ''
         groups = groups or []
-        subscriptionId = subscriptionId or Subscription.NONE
         
         c = DB().cursor()
         
@@ -85,11 +85,17 @@ class Roster:
         res = c.fetchone()
         if res:
             # this is an update
-            # we don't update the subscription as it's the job of <presence>
+            # we update the subscription if it's given to us; o/w
+            # just update the name
             cid = res[0]
-            c.execute("UPDATE roster SET name = ?, subscription = ?\
-                       WHERE contactid = ?",
-                      (name, cid, subscriptionId))
+            if subscriptionId:
+                c.execute("UPDATE roster SET name = ?, subscription = ?\
+                           WHERE contactid = ?",
+                          (name, cid, subscriptionId))
+            else:
+                c.execute("UPDATE roster SET name = ?\
+                           WHERE contactid = ?",
+                          (name, cid))
         else:
             # this is a new roster entry
             
@@ -109,7 +115,9 @@ class Roster:
             c.execute("INSERT INTO roster\
                        (userid, contactid, name, subscription)\
                        VALUES\
-                       (?, ?, ?, ?)", (self.uid, cid, name, subscriptionId))
+                       (?, ?, ?, ?)",
+                       (self.uid, cid, name,
+                        subscriptionId or Subscription.NONE))
                 
                 
         # UPDATE GROUPS
@@ -123,7 +131,7 @@ class Roster:
             # get the group id
             c.execute("SELECT groupid\
                        FROM rostergroups\
-                       WHERE userid = ? AND name = ?", (self.uid, groupName.text))
+                       WHERE userid = ? AND name = ?", (self.uid, groupName))
             res = c.fetchone()
             if res:
                 gid = res[0]
@@ -132,7 +140,7 @@ class Roster:
                 res = c.execute("INSERT INTO rostergroups\
                                  (userid, name)\
                                  VALUES\
-                                 (?, ?)", (self.uid, groupName.text))
+                                 (?, ?)", (self.uid, groupName))
                 gid = res.lastrowid
             
             c.execute("INSERT INTO rostergroupitems\
@@ -176,6 +184,19 @@ class Roster:
         
         return cid
         
+    def getSubscription(self, cid):
+        """Returns the subscription id of this user's contact with id cid"""
+        c = DB().cursor()
+        c.execute("SELECT subscription FROM roster\
+                   WHERE userid = ? AND contactid = ?", (self.uid, cid))
+        res = c.fetchone()
+        if res:
+            sub = res[0]
+            c.close()
+            return sub
+        else:
+            raise Exception, "No such contact in roster"
+    
     def setSubscription(self, cid, sub):
         """Sets the subscription from the perspective of this user to a
         contact with ID cid to sub, which is an id retrieved via the
@@ -268,6 +289,37 @@ class Roster:
             query.append(self.items[item].getAsTree())
             
         return query
+    
+    def createRosterQuery(cjid, subName, name=None, groups=None, itemArgs=None):
+        """Creates and returns a <query> item for sending in an <iq> in a
+        roster push.
+        cjid -- jid as a str for the contact in a roster item.
+        subName -- name of the subscription as a str.
+        name -- name for the contact. Can be None.
+        groups -- list of group names as strings.
+        """
+        itemArgs = itemArgs or {}
+        query = Element('query', {'xmlns' : 'jabber:iq:roster'})
+            
+        d = {
+             'jid' : cjid,
+             'subscription' : subName,
+             }
+        if name:
+            d['name'] = name
+            
+        d.update(itemArgs)
+            
+        item = SubElement(query, 'item', d)
+        
+        for groupName in groups:
+            if groupName: # don't want empty groups
+                group = Element('group')
+                group.text = groupName
+                item.append(group)
+            
+        return query
+    createRosterQuery = staticmethod(createRosterQuery)
 
 class RosterItem:
     """Models the <item> element in a roster"""

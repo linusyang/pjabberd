@@ -228,7 +228,7 @@ def pickupResults():
             for server in activeServers:
                 if connId in server.conns:
                     conn = server.conns[connId][1]
-                    # FIXME: this should be prevented
+                    # FIXME: this should be prevented. test socket for writability
                     try:
                         conn.send(prepareDataForSending(out))
                     except socket.error, e:

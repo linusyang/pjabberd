@@ -1,10 +1,12 @@
 """ XML Stream parsers """
 
+import pjs.elementtree.ElementTree as et
+import re
+import logging
+
 from xml.parsers import expat
 from pjs.events import Dispatcher, C2SStanzaDispatcher, S2SStanzaDispatcher
 from copy import deepcopy
-import pjs.elementtree.ElementTree as et
-import re
 
 def borrow_parser(conn):
     """Borrow a parser from a pool of parsers"""
@@ -64,6 +66,8 @@ class IncrStreamParser:
         be parsed and the appropriate events dispatched. The incomplete XML
         will be buffered.
         """
+        if data != ' ':
+            logging.debug("[parser] For connection %s parser got: %s", self.conn.id, data)
         self._parser.Parse(data, 0)
 
     def close(self):
