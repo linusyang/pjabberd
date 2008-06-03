@@ -216,13 +216,6 @@ def _runMessages():
             msg.process()
         i += 1
     
-#    for connId, msg in _processingQ:
-#        if connId not in _runningMessages:
-#            _runningMessages[connId] = msg
-#            completed = msg.process()
-#            if completed:
-#                del _processingQ[(connId, msg)]
-
 activeServers = pjs.conf.conf.launcher.servers
             
 def pickupResults():
