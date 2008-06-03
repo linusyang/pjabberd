@@ -4,6 +4,8 @@ try:
     from hashlib import sha1
 except ImportError:
     from sha import new as sha1
+    
+import time, os
 
 # This is used in pjs.async.asyncore.
 class FunctionCall:
@@ -32,4 +34,4 @@ class FunctionCall:
     
 
 def generateId():
-    return sha1(str((random(), random(), random()))).hexdigest()
+    return sha1(str((random(), time.gmtime(), os.getpid()))).hexdigest()
