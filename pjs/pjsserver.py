@@ -39,47 +39,15 @@ class PJSLauncher:
         
     def stop(self):
         self.triggerConn.handle_close()
-        self._c2s.handle_close()
-        self._s2s.handle_close()
+        self._c2s.handle_close(True)
+        self._s2s.handle_close(True)
         
     def getC2SServer(self):
         return self._c2s
     def getS2SServer(self):
         return self._s2s
 
-if __name__ == '__main__':
-    launcher = PJSLauncher()
-    pjs.conf.conf.launcher = launcher
-    
-    # TODO: move all of this into a config file + parser
-    
-    logFileName = 'server-log'
-    logDir = 'log'
-    logLoc = os.path.join(logDir, logFileName)
-    logLevel = logging.DEBUG
-    
-    def configLogging(filename=logFileName, level=logLevel,
-                     format='%(asctime)s %(levelname)-8s %(message)s'):
-        try:
-            logging.basicConfig(filename=filename, level=level, format=format)
-        except IOError:
-            print >> sys.stderr, 'Could not create a log file. Logging to stderr.'
-            logging.basicConfig(level=level, format=format)
-    
-    if os.path.exists('log'):
-        if os.path.isdir('log') and os.access('log', os.W_OK):
-            configLogging(logLoc)
-        else:
-            print >> sys.stderr, 'Logging directory is not accessible'
-            configLogging()
-    else:
-        try:
-            os.mkdir('log')
-            configLogging(logLoc)
-        except IOError:
-            print >> sys.stderr, 'Could not create logging directory'
-            configLogging()
-        
+def populateDB():
     con = DB()
     c = con.cursor()
     try:
@@ -116,6 +84,41 @@ if __name__ == '__main__':
         if e.message.find('already exists') >= 0: pass
         else: raise
     c.close()
+
+if __name__ == '__main__':
+    launcher = PJSLauncher()
+    pjs.conf.conf.launcher = launcher
+    
+    # TODO: move all of this into a config file + parser
+    
+    logFileName = 'server-log'
+    logDir = 'log'
+    logLoc = os.path.join(logDir, logFileName)
+    logLevel = logging.DEBUG
+    
+    def configLogging(filename=logFileName, level=logLevel,
+                     format='%(asctime)s %(levelname)-8s %(message)s'):
+        try:
+            logging.basicConfig(filename=filename, level=level, format=format)
+        except IOError:
+            print >> sys.stderr, 'Could not create a log file. Logging to stderr.'
+            logging.basicConfig(level=level, format=format)
+    
+    if os.path.exists('log'):
+        if os.path.isdir('log') and os.access('log', os.W_OK):
+            configLogging(logLoc)
+        else:
+            print >> sys.stderr, 'Logging directory is not accessible'
+            configLogging()
+    else:
+        try:
+            os.mkdir('log')
+            configLogging(logLoc)
+        except IOError:
+            print >> sys.stderr, 'Could not create logging directory'
+            configLogging()
+
+    populateDB()
     
     launcher.run()
     logging.info('server started')

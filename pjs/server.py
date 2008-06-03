@@ -24,9 +24,18 @@ class Server(dispatcher):
         self.ip = ip
         self.hostname = ip
         self.port = port
-        self.create_socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.set_reuse_addr()
-        self.bind((ip, port))
+        
+        # sometimes binding takes a couple of tries if the server was quickly
+        # restarted
+        for i in range(3):
+            try:
+                self.create_socket(socket.AF_INET, socket.SOCK_STREAM)
+                self.set_reuse_addr()
+                self.bind((ip, port))
+                break
+            except socket.error, e:
+                if i == 2: raise
+        
         self.listen(5)
         
         # Server-wide data. ie. used for finding all connections for a certain
@@ -47,10 +56,14 @@ class Server(dispatcher):
         # we don't know the JID until client logs in
         self.conns[conn.id] = (None, conn)
         
-    def handle_close(self):
+    def handle_close(self, unconditionalClose=False):
+        if unconditionalClose:
+            self.close()
+            return
+        
+        self.close()
         for c in self.conns:
             self.conns[c][1].handle_close()
-        self.close()
 
 class C2SServer(Server):
     """Server that handles incoming C2S connections from local clients"""

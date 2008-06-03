@@ -28,7 +28,7 @@ class ServerHelper(asyncore.dispatcher):
         self.close()
         
 class TestWatchFunction(unittest.TestCase):
-    """Testing of the function-watching feature of pjs.async.asyncore"""
+    """Testing of the function-watching feature of pjs.async.core"""
     
     def setUp(self):
         unittest.TestCase.setUp(self)

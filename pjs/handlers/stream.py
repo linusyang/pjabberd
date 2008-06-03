@@ -252,7 +252,10 @@ class CleanUpConnHandler(Handler):
         if data.has_key('user'):
             jid = data['user']['jid']
             resource = data['user']['resource']
-            del msg.conn.server.data['resources'][jid][resource]
+            
+            # the connection could've been closed before binding
+            if jid and resource:
+                del msg.conn.server.data['resources'][jid][resource]
         
         del conn.server.conns[conn.id]
         
