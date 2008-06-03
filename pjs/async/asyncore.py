@@ -59,6 +59,11 @@ try:
     socket_map
 except NameError:
     socket_map = {}
+    
+try:
+    func_map # tuple of (func, funcArgs={})
+except NameError:
+    func_map = {}
 
 class ExitNow(Exception):
     pass
@@ -142,6 +147,9 @@ def poll(timeout=0.0, map=None):
             if obj is None:
                 continue
             _exception(obj)
+        
+    if func_map:
+        funcCheck()
 
 def poll2(timeout=0.0, map=None):
     # Use the poll() support added to the select module in Python 2.0
@@ -174,8 +182,28 @@ def poll2(timeout=0.0, map=None):
             if obj is None:
                 continue
             readwrite(obj, flags)
+            
+    if func_map:
+        funcCheck()
 
 poll3 = poll2                           # Alias for backward compatibility
+
+def funcCheck():
+    """Try running all functions in the map with params. Whenever one returns
+    True, call its callback func.
+    """
+    for f in func_map.keys():
+        ret = False
+        cb = func_map[f]
+        
+        try:
+            ret = f.func(*f.funcArgs)
+        except Exception, e:
+            cb(e)
+        
+        if ret:
+            cb()
+            del func_map[f]
 
 def loop(timeout=30.0, use_poll=False, map=None, count=None):
     if map is None:
@@ -275,6 +303,32 @@ class dispatcher:
                 )
         except socket.error:
             pass
+        
+    ### ======================= ###
+    ### Function watching stuff ###
+    ### ======================= ###
+    def watch_function(self, checkFunc, cb, initFunc=None):
+        """Start watching function checkFunc.func for return value of True.
+        This executes initFunc.func once before running checkFunc (if provided).
+        When checkFunc.func returns True, cb is called. checkFunc and
+        initFunc are pjs.utils.FunctionCall objects, so that they are
+        hashable in func_map.
+        
+        If an exception is raised when calling initFunc.func or checkFunc.func,
+        cb will be passed the exception as a parameter, so it should be of the
+        form: def cb(exception=None)
+        """
+        assert(hasattr(checkFunc, 'func') and callable(cb))
+
+        if (initFunc):
+            assert(hasattr(initFunc, 'func'))
+            try:
+                initFunc.func(*initFunc.funcArgs)
+            except Exception, e:
+                cb(e)
+                return
+        
+        func_map[checkFunc] = cb
 
     # ==================================================
     # predicates for select()
