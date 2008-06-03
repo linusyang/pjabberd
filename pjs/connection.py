@@ -22,8 +22,7 @@ class Connection(asyncore.dispatcher_with_send):
         #            },
         # 'sasl' : {
         #            'mech' : 'PLAIN' / 'DIGEST-MD5',
-        #            'challenge' : str (last sasl challenge),
-        #            'stage' : int,
+        #            'mechObj' : <reference to one of SASL mech objects>
         #            'complete' : True/False
         #          },
         # 'tls' : {

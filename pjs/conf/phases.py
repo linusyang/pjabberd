@@ -37,7 +37,7 @@ corePhases = {
           'sasl-response' : {
                              'description' : 'SASL client\'s response to challenge',
                              'xpath' : '{urn:ietf:params:xml:ns:xmpp-sasl}response',
-                             'handlers' : [],
+                             'handlers' : [h['sasl-response'], h['write']],
                              'errorHandlers' : [h['sasl-error']]
                              },
           'sasl-abort' : {

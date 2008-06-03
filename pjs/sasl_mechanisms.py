@@ -1,81 +1,250 @@
-"""Plain and DigestMD5 are borrowed from twisted's words.protocols.jabber with
-some extra bits removed."""
-# see TWISTED-LICENSE for details
+import binascii
+import base64
+import re
 
-import binascii, time, os, random
+from pjs.db import db
+from pjs.utils import generateId
+from pjs.elementtree.ElementTree import Element
 
 try:
+    # python >= 2.5
     from hashlib import md5
 except ImportError:
     from md5 import new as md5
 
+try:
+    # Python >= 2.4
+    from base64 import b64decode, b64encode
+except ImportError:
+    import base64
+
+    def b64encode(s):
+        return "".join(base64.encodestring(s).split("\n"))
+
+    b64decode = base64.decodestring
+    
+base64Pattern = re.compile("^[0-9A-Za-z+/]*[0-9A-Za-z+/=]{,2}$")
+
+def fromBase64(s):
+    """
+    Decode base64 encoded string.
+
+    This helper performs regular decoding of a base64 encoded string, but also
+    rejects any characters that are not in the base64 alphabet and padding
+    occurring elsewhere from the last or last two characters, as specified in
+    section 14.9 of RFC 3920. This safeguards against various attack vectors
+    among which the creation of a covert channel that "leaks" information.
+    """
+
+    if base64Pattern.match(s) is None:
+        raise
+
+    return b64decode(s) # could raise an exception if cannot decode
+
+def H(s):
+    """Let H(s) be the 16 octet MD5 hash [RFC 1321] of the octet string s.
+    
+    See: RFC 2831
+    """
+    return md5(s).digest()
+
+def HEX(n):
+    """Let HEX(n) be the representation of the 16 octet MD5 hash n as a
+    string of 32 hex digits (with alphabetic characters always in lower
+    case, since MD5 is case sensitive).
+    
+    See: RFC 2831
+    """
+    return binascii.b2a_hex(n)
+
+def KD(k, s):
+    """Let KD(k, s) be H({k, ":", s}), i.e., the 16 octet hash of the string
+    k, a colon and the string s.
+    
+    See: RFC 2831
+    """
+    return H('%s:%s' % (k, s))
+
 class Plain:
-    """
-    Implements the PLAIN SASL authentication mechanism.
-
-    The PLAIN SASL authentication mechanism is defined in RFC 2595.
-    """
-    def __init__(self, authzid, authcid, password):
-        self.authzid = authzid or ''
-        self.authcid = authcid or ''
-        self.password = password or ''
-
-
-    def getInitialResponse(self):
-        return "%s\x00%s\x00%s" % (self.authzid.encode('utf-8'),
-                                   self.authcid.encode('utf-8'),
-                                   self.password.encode('utf-8'))
+    """Implements the PLAIN authentication mechanism"""
+    def __init__(self, msg):
+        self.msg = msg
         
+    def handle(self, b64text):
+        """Verify the username/password in response"""
+        authtext = ''
+        if b64text:
+            try:
+                authtext = fromBase64(b64text)
+            except:
+                raise SASLIncorrectEncodingError
+            
+            auth = authtext.split('\x00')
+            
+            if len(auth) != 3:
+                raise SASLIncorrectEncodingError
+            
+            c = db.cursor()
+            c.execute("SELECT * FROM users WHERE \
+                username = ? AND password = ?", (auth[1], auth[2]))
+            res = c.fetchall()
+            if len(res) == 0:
+                raise SASLAuthError
+        
+        self.msg.conn.data['sasl']['complete'] = True
+        self.msg.conn.data['user'] = {
+                                 'jid' : '%s@%s' % (auth[1], self.msg.conn.server.hostname),
+                                 'resource' : '',
+                                 'in-session' : False
+                                 }
+        self.msg.addTextOutput(u"<success xmlns='urn:ietf:params:xml:ns:xmpp-sasl'/>")
+        self.msg.conn.parser.resetParser()
+
 class DigestMD5:
+    """Implements the DIGEST-MD5 authentication mechanism. Stores state
+    of the authentication, so should be saved between requests.
     """
-    Implements the DIGEST-MD5 SASL authentication mechanism.
-
-    The DIGEST-MD5 SASL authentication mechanism is defined in RFC 2831.
-    """
-
-    def __init__(self, serv_type, host, serv_name, username, password):
-        self.username = username
-        self.password = password
-        self.defaultRealm = host
-
-        self.digest_uri = '%s/%s' % (serv_type, host)
-        if serv_name is not None:
-            self.digest_uri += '/%s' % serv_name
-
-
-    def getInitialResponse(self):
-        return None
-
-
-    def getResponse(self, challenge):
-        directives = self._parse(challenge)
-
-        # Compat for implementations that do not send this along with
-        # a succesful authentication.
-        if 'rspauth' in directives:
-            return ''
-
-        try:
-            realm = directives['realm']
-        except KeyError:
-            realm = self.defaultRealm
-
-        return self._gen_response(directives['charset'],
-                                  realm,
-                                  directives['nonce'])
-
-    def _parse(self, challenge):
+    
+    # states
+    INIT = 0
+    SENT_CHALLENGE1 = 1
+    SENT_CHALLENGE2 = 2
+    
+    # max # of auth failures before reset of state
+    MAX_FAILURES = 2
+    
+    
+    def __init__(self, msg):
+        self.nonce = None
+        self.nc = 0x0
+        self.realm = msg.conn.server.hostname
+        self.username = None
+        self.failures = 0
+        self.state = DigestMD5.INIT
+    
+    def handle(self, msg, data=None):
+        """Performs DIGEST-MD5 auth based on current state.
+        
+        msg -- the Message object. This has to be passed in, because this object
+                may be shared between Message instances
+        data -- either None for initial challenge, base64-encoded text when
+                the client responds to challenge 1, or the tree when the client
+                responds to challenge 2.
         """
-        Parses the server challenge.
-
-        Splits the challenge into a dictionary of directives with values.
-
-        @return: challenge directives and their values.
-        @rtype: L{dict} of L{str} to L{str}.
+        
+        # TODO: authz
+        # TODO: subsequent auth
+        
+        qop = 'qop="auth"'
+        charset = 'charset=utf-8'
+        algo = 'algorithm=md5-sess'
+        
+        if self.state == DigestMD5.INIT: # initial challenge
+            self.nonce = generateId()
+            self.state = DigestMD5.SENT_CHALLENGE1
+            
+            nonce = 'nonce="%s"' % self.nonce
+            realm = 'realm="%s"' % self.realm
+            
+            msg.addTextOutput(u"<challenge xmlns='urn:ietf:params:xml:ns:xmpp-sasl'>" + \
+                                base64.b64encode(','.join([realm, qop, nonce,
+                                                           charset, algo])) + \
+                                "</challenge>")
+        elif self.state == DigestMD5.SENT_CHALLENGE1 and data:
+            # response to client's reponse (ie. challenge 2)
+            try:
+                text = fromBase64(data)
+            except:
+                raise SASLIncorrectEncodingError
+            
+            pairs = self._parse(text)
+            try:
+                username = pairs['username']
+                nonce = pairs['nonce']
+                realm = pairs['realm']
+                cnonce = pairs['cnonce']
+                nc = pairs['nc']
+                qop = pairs['qop']
+                response = pairs['response']
+                digest_uri = pairs['digest-uri']
+            except KeyError:
+                self._handleFailure()
+                raise SASLAuthError
+            
+            self.username = username
+            
+            # authz is ignored for now
+            if nonce != self.nonce or realm != self.realm \
+                or int(nc, 16) != 1 or qop[0] != 'auth' or not response\
+                or not digest_uri:
+                self._handleFailure()
+                raise SASLAuthError
+            
+            # fetch the password now
+            c = db.cursor()
+            c.execute("SELECT password FROM users WHERE \
+                username = ?", (username,))
+            res = c.fetchall()
+            if len(res) == 0:
+                self._handleFailure()
+                raise SASLAuthError
+            else:
+                password = res[0][0]
+            
+            # compute the digest as per RFC 2831
+            a1 = "%s:%s:%s" % (H("%s:%s:%s" % (username, realm, password)),
+                               nonce, cnonce)
+            a2 = ":%s" % digest_uri
+            a2client = "AUTHENTICATE:%s" % digest_uri
+            
+            digest = HEX(KD(HEX(H(a1)),
+                            "%s:%s:%s:%s:%s" % (nonce, nc,
+                                                  cnonce, "auth",
+                                                  HEX(H(a2client)))))
+            
+            if digest == response:
+                rspauth = HEX(KD(HEX(H(a1)),
+                                 "%s:%s:%s:%s:%s" % (nonce, nc,
+                                                       cnonce, "auth",
+                                                       HEX(H(a2)))))
+                
+                self.state = DigestMD5.SENT_CHALLENGE2
+                
+                msg.addTextOutput(u"<challenge xmlns='urn:ietf:params:xml:ns:xmpp-sasl'>" + \
+                                    base64.b64encode(u"rspauth=%s" % rspauth) + \
+                                    "</challenge>")
+            else:
+                self._handleFailure()
+                raise SASLAuthError
+        elif self.state == DigestMD5.SENT_CHALLENGE2 and len(data):
+            # expect to get <response xmlns='urn:ietf:params:xml:ns:xmpp-sasl'/>
+            resp = data.find('{urn:ietf:params:xml:ns:xmpp-sasl}response')
+            if resp is not None and len(resp) == 0:
+                self.state = DigestMD5.INIT
+                msg.conn.data['sasl']['complete'] = True
+                msg.conn.data['user'] = {
+                                         'jid' : '%s@%s' % (self.username, msg.conn.server.hostname),
+                                         'resource' : '',
+                                         'in-session' : False
+                                         }
+                msg.addTextOutput(u"<success xmlns='urn:ietf:params:xml:ns:xmpp-sasl'/>")
+                msg.conn.parser.resetParser()
+            else:
+                self._handleFailure()
+                raise SASLAuthError
+        else:
+            self._handleFailure()
+            raise SASLAuthError
+        
+    
+    def _parse(self, challenge):
+        """Parses the client's response to our challenge 1.
+        This code is a modified version of twisted's sasl_mechanisms.py.
+        See TWISTED-LICENSE.
         """
         s = challenge
         paramDict = {}
-        cur = 0
+        cur = 0 # current starting position
         remainingParams = True
         while remainingParams:
             # Parse a param. We can't just split on commas, because there can
@@ -83,11 +252,15 @@ class DigestMD5:
             # qop="auth,auth-int"
 
             middle = s.index("=", cur)
+            if middle < 1: # can't have a blank key
+                raise SASLIncorrectEncodingError
             name = s[cur:middle].lstrip()
             middle += 1
             if s[middle] == '"':
                 middle += 1
                 end = s.index('"', middle)
+                if end == -1:
+                    raise SASLIncorrectEncodingError
                 value = s[middle:end]
                 cur = s.find(',', end) + 1
                 if cur == 0:
@@ -107,83 +280,31 @@ class DigestMD5:
                 paramDict[param] = paramDict[param].split(',')
 
         return paramDict
+    
+    def _handleFailure(self):
+        self.failures += 1
+        if (self.failures > DigestMD5.MAX_FAILURES):
+            self.failures = 0
+            self.state = DigestMD5.INIT
 
-    def _unparse(self, directives):
-        """
-        Create message string from directives.
-
-        @param directives: dictionary of directives (names to their values).
-                           For certain directives, extra quotes are added, as
-                           needed.
-        @type directives: L{dict} of L{str} to L{str}
-        @return: message string.
-        @rtype: L{str}.
-        """
-
-        directive_list = []
-        for name, value in directives.iteritems():
-            if name in ('username', 'realm', 'cnonce',
-                        'nonce', 'digest-uri', 'authzid', 'cipher'):
-                directive = '%s="%s"' % (name, value)
-            else:
-                directive = '%s=%s' % (name, value)
-
-            directive_list.append(directive)
-
-        return ','.join(directive_list)
-
-
-    def _gen_response(self, charset, realm, nonce):
-        """
-        Generate response-value.
-
-        Creates a response to a challenge according to section 2.1.2.1 of
-        RFC 2831 using the L{charset}, L{realm} and L{nonce} directives
-        from the challenge.
-        """
-
-        def H(s):
-            return md5(s).digest()
-
-        def HEX(n):
-            return binascii.b2a_hex(n)
-
-        def KD(k, s):
-            return H('%s:%s' % (k, s))
-
-        try:
-            username = self.username.encode(charset)
-            password = self.password.encode(charset)
-        except UnicodeError:
-            # TODO - add error checking
-            raise
-
-        nc = '%08x' % 1 # TODO: support subsequent auth.
-        cnonce = self._gen_nonce()
-        qop = 'auth'
-
-        # TODO - add support for authzid
-        a1 = "%s:%s:%s" % (H("%s:%s:%s" % (username, realm, password)),
-                           nonce,
-                           cnonce)
-        a2 = "AUTHENTICATE:%s" % self.digest_uri
-
-        response = HEX( KD ( HEX(H(a1)),
-                             "%s:%s:%s:%s:%s" % (nonce, nc,
-                                                 cnonce, "auth", HEX(H(a2)))))
-
-        directives = {'username': username,
-                      'realm' : realm,
-                      'nonce' : nonce,
-                      'cnonce' : cnonce,
-                      'nc' : nc,
-                      'qop' : qop,
-                      'digest-uri': self.digest_uri,
-                      'response': response,
-                      'charset': charset}
-
-        return self._unparse(directives)
-
-
-    def _gen_nonce(self):
-        return md5("%s:%s:%s" % (str(random.random()) , str(time.gmtime()),str(os.getpid()))).hexdigest()
+class SASLError(Exception):
+    def errorElement(self):
+        raise NotImplementedError, 'must be overridden in a subclass'
+class SASLIncorrectEncodingError(SASLError):
+    def errorElement(self):
+        return Element('incorrect-encoding')
+class SASLInvalidAuthzError(SASLError):
+    def errorElement(self):
+        return Element('invalid-authzid')
+class SASLInvalidMechanismError(SASLError):
+    def errorElement(self):
+        return Element('invalid-mechanism')
+class SASLMechanismTooWeakError(SASLError):
+    def errorElement(self):
+        return Element('mechanism-too-weak')
+class SASLAuthError(SASLError):
+    def errorElement(self):
+        return Element('not-authorized')
+class SASLTempAuthError(SASLError):
+    def errorElement(self):
+        return Element('temporary-auth-failure')

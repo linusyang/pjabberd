@@ -49,6 +49,10 @@ handlers = {
                            'handler' : pjs.handlers.sasl.SASLAuthHandler,
                            'description' : 'incoming SASL auth handler'
                            },
+            'sasl-response' : {
+                               'handler' : pjs.handlers.sasl.SASLResponseHandler,
+                               'description' : 'incoming SASL challenge response handler'
+                               },
             'sasl-error' : {
                             'handler' : pjs.handlers.sasl.SASLErrorHandler,
                             'description' : 'handles SASLErrors and responds with '+\

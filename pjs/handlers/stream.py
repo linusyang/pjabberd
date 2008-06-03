@@ -78,6 +78,7 @@ class FeaturesAuthHandler(Handler):
     def handle(self, tree, msg, lastRetVal=None):
         res = u"<stream:features>" + \
                 "<mechanisms xmlns='urn:ietf:params:xml:ns:xmpp-sasl'>" + \
+                "<mechanism>DIGEST-MD5</mechanism>" + \
                 "<mechanism>PLAIN</mechanism>" + \
                 "</mechanisms></stream:features>"
                 
