@@ -72,47 +72,6 @@ class Connection(asyncore.dispatcher_with_send):
         data = self.recv(4096)
         self.parser.feed(data)
 
-class LocalS2SConnection(Connection):
-    """Fake local connection for faster message processing between two
-    JIDs on our server.
-    """
-    def __init__(self, server):
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.connect(('localhost', 5222))
-        Connection.__init__(self, s, s.getsockname(), server)
-        
-        p = self.parser._parser
-        
-        # fake the <stream> header
-        p.StartElementHandler = None
-        p.EndElementHandler = None
-        p.CharacterDataHandler = None
-        p.StartNamespaceDeclHandler = None
-        
-        stream = "<stream:stream xmlns='jabber:server' " +\
-              "xmlns:stream='http://etherx.jabber.org/streams' " +\
-              "from='%s' id='local' version='1.0'>" % (server.hostname)
-        self.feed(stream)
-        
-        # record so that xpath queries work
-        self.parser.stream = Element('{http://etherx.jabber.org/streams}stream',
-                                     {
-                                      'from' : server.hostname,
-                                      'id' : 'local',
-                                      'version' : '1.0'
-                                      })
-        
-        # reinstate the handlers
-        p.StartElementHandler = self.parser.handle_start
-        p.EndElementHandler = self.parser.handle_end
-        p.CharacterDataHandler = self.parser.handle_text
-        p.StartNamespaceDeclHandler = self.parser.handle_ns
-        
-        #self.send = self.feed
-        
-    def feed(self, data):
-        self.parser.feed(data)
-
 class LocalTriggerConnection(asyncore.dispatcher_with_send):
     """This creates a local connection back to our server.
     

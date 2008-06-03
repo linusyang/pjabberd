@@ -5,7 +5,7 @@ import socket
 import logging
 import os, os.path, sys
 
-from pjs.connection import Connection, LocalTriggerConnection, LocalS2SConnection
+from pjs.connection import Connection, LocalTriggerConnection
 from pjs.async.core import dispatcher
 from pjs.jid import JID
 from pjs.router import Router
@@ -125,11 +125,6 @@ if __name__ == '__main__':
     s = Server('localhost', 5222)
     
     pjs.conf.conf.server = s
-    
-    # create local s2s connection
-    locCon = LocalS2SConnection(s)
-    locCon.data['stream']['type'] = 's2s'
-    pjs.conf.conf.localConn = locCon
     
     # create the router
     pjs.conf.conf.router = Router(s.hostname)
