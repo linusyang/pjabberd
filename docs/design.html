@@ -76,7 +76,7 @@
 
 <h3>Threaded Handlers</h3>
 
-<p>Because we need to allow handlers to perform I/O-based operations, we need to have <code>ThreadedHandler</code>s (see above). Because the entire server is running in a single thread, and because we need to ensure that message processing is occuring in order for any client (see <a href="http://www.xmpp.org/rfcs/rfc3921.html">RFC 3921</a>), the <code>pjs.events</code> keeps a queue of running <code>Message</code>s per connection and skips those that are already running. When a threaded handler is done (that is, when the function is provided to the framework returns <code>True</code>) the handler's <code>resume()</code> function is called within the main thread. Basically, the execution of the handlers chain is brought back into the main process after each each threaded handler's operation completes.</p>
+<p>Because we need to allow handlers to perform I/O-based operations, we need to have <code>ThreadedHandler</code>s (see above). Because the entire server is running in a single thread, and because we need to ensure that message processing is occuring in order for any client (see <a href="http://www.xmpp.org/rfcs/rfc3921.html">RFC 3921</a>), the <code>pjs.events</code> keeps a queue of running <code>Message</code>s per connection and skips those that are already running. When a threaded handler is done (that is, when the function is provided to the framework returns <code>True</code>) the handler's <code>resume()</code> function is called within the main thread. Basically, the execution of the handlers chain is brought back into the main process after each threaded handler's operation completes. This allows only <em>some</em> handlers in a chain to be run in a thread.</p>
 
 <h2>Data Persistence</h2>
 

@@ -75,7 +75,7 @@ The chained handlers design also allows for handling unexpected exceptions. Each
 
 ### Threaded Handlers ###
 
-Because we need to allow handlers to perform I/O-based operations, we need to have `ThreadedHandler`s (see above). Because the entire server is running in a single thread, and because we need to ensure that message processing is occuring in order for any client (see [RFC 3921][3921]), the `pjs.events` keeps a queue of running `Message`s per connection and skips those that are already running. When a threaded handler is done (that is, when the function is provided to the framework returns `True`) the handler's `resume()` function is called within the main thread. Basically, the execution of the handlers chain is brought back into the main process after each each threaded handler's operation completes.
+Because we need to allow handlers to perform I/O-based operations, we need to have `ThreadedHandler`s (see above). Because the entire server is running in a single thread, and because we need to ensure that message processing is occuring in order for any client (see [RFC 3921][3921]), the `pjs.events` keeps a queue of running `Message`s per connection and skips those that are already running. When a threaded handler is done (that is, when the function is provided to the framework returns `True`) the handler's `resume()` function is called within the main thread. Basically, the execution of the handlers chain is brought back into the main process after each threaded handler's operation completes. This allows only *some* handlers in a chain to be run in a thread.
 
 Data Persistence
 ----------------
