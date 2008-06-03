@@ -6,6 +6,7 @@ from pjs.roster import Roster, RosterItem
 from pjs.elementtree.ElementTree import Element, SubElement
 from pjs.utils import tostring, generateId, FunctionCall
 from pjs.db import DB
+from copy import deepcopy
 
 class IQBindHandler(Handler):
     """Handles resource binding"""
@@ -155,10 +156,20 @@ class IQRosterUpdateHandler(ThreadedHandler):
                                 "without a jid. Tree: %s", tree[0])
                 # TODO: throw exception here
                 return
+
+            roster = Roster(jid)
+            
+            xpath = './{jabber:iq:roster}query/{jabber:iq:roster}item[@subscription="remove"]'
+            if tree[0].find(xpath) is not None:
+                # we're removing the roster item
+                roster.removeContact(cjid)
+                query = deepcopy(tree[0][0])
+                msg.setNextHandler('roster-push')
+                return chainOutput(lastRetVal, query)
+            
+            # we're updating/adding the roster item
             
             groups = list(item.findall('{jabber:iq:roster}group'))
-            
-            roster = Roster(jid)
             
             cid = roster.updateContact(cjid, groups, name)
             

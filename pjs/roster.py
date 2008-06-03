@@ -31,7 +31,9 @@ class Roster:
                             group, contactId)
     
     def updateContact(self, cjid, groups, name=None):
-        """Adds or updates a contact in this user's roster"""
+        """Adds or updates a contact in this user's roster. Returns the
+        contact's id in the DB.
+        """
         c = DB().cursor()
         
         # check if this is an update to an existing roster entry
@@ -99,6 +101,38 @@ class Roster:
         c.close()
             
         return cid
+    
+    def removeContact(self, cjid):
+        """Removes the contact from this user's roster. Returns the contact's
+        id in the DB.
+        """
+        c = DB().cursor()
+        
+        # get the contact's id
+        c.execute("SELECT jids.id\
+                   FROM roster\
+                   JOIN jids ON roster.contactid = jids.id\
+                   WHERE roster.userid = ? AND jids.jid = ?", (self.uid, cjid))
+        res = c.fetchone()
+        if res:
+            cid = res[0]
+        else:
+            raise Exception, "No such contact in user's roster"
+        
+        # delete the contact from all groups it's in for this user
+        c.execute("DELETE FROM rostergroupitems\
+                   WHERE rostergroupitems.groupid IN (\
+                       SELECT rgs.groupid FROM rostergroups AS rgs\
+                       JOIN rostergroupitems AS rgi ON rgi.groupid = rgs.groupid\
+                       WHERE rgs.userid = ?\
+                    ) AND rostergroupitems.contactid = ?", (self.uid, cid))
+        
+        # now delete the roster entry
+        c.execute("DELETE FROM roster\
+                   WHERE userid = ? AND contactid = ?", (self.uid, cid))
+        
+        return cid
+        
     
     def getSubPrimaryName(self, cid):
         """Gets the primary name of a subscription for this user and this
