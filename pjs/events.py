@@ -1,4 +1,6 @@
 import pjs.handlers.base
+from pjs.conf.phases import phases
+from pjs.conf.handlers import handlers as h
 
 class Message:
     def __init__(self, tree, conn, handlers, errorHandlers, currentPhase=None):
@@ -92,5 +94,48 @@ class Message:
         
         return shouldReturn
     
-class Dispatcher:
-    pass
+class _Dispatcher(object):
+    """Dispatches events in a phase to Messages for handling. This class
+    uses the Singleton pattern.
+    """
+    def __init__(self):
+        pass
+    
+    def dispatch(self, tree, conn, knownPhase=None):
+        """Dispatch a Message object to process the stanza.
+        
+        tree -- stanza expressed as ElementTree's Element. This will be wrapped
+                with the <stream> Element to allow for XPath querying
+        conn -- connection that called this dispatcher
+        knownPhase -- the phase that this packet is in, if known.
+        """
+        phaseName = 'default'
+        phase = phases[phaseName]
+        
+        if knownPhase and phases.has_key(knownPhase):
+            phase = phases[knownPhase]
+            phaseName = knownPhase
+        else:
+            # loop through all phases to find the one who's XPath expr matches
+            # the stanza
+            # FIXME: this is likely to be a bottleneck
+            for p in phases:
+                if p.has_key('xpath') and tree.find(p['xpath']) is not None:
+                    phase = phases[p]
+                    phaseName = p
+
+        # handlers get instantiated and loaded up into lists
+        if phase.has_key('handlers'):
+            handlers = [item['handler']() for item in phase['handlers']]
+            if phase.has_key('errorHandlers'):
+                errorHandlers = [item['handler']() for item in phase['errorHandlers']]
+            else:
+                errorHandlers = []
+        else:
+            return
+                
+        msg = Message(tree, conn, handlers, errorHandlers, phaseName)
+        msg.process()
+
+_dispatcher = _Dispatcher()
+def Dispatcher(): return _dispatcher

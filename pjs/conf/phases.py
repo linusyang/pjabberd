@@ -5,6 +5,9 @@ from pjs.conf.handlers import handlers as h
 # TODO: add functions to fetch phases from the config file
 
 phases = {
+          'default' : {
+                       'description' : 'default phase for when no other matches'
+                       },
           'stream-init' : {
                            'description' : 'initializes stream data',
                            'handlers' : []

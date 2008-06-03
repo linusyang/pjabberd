@@ -1,6 +1,7 @@
 """List of handlers and their descriptions"""
 
 import pjs.handlers.write
+import pjs.handlers.simple
 
 # TODO: add functions to fetch handlers from the config file
 

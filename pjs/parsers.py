@@ -2,6 +2,7 @@
 
 from xml.parsers import expat
 import pjs.elementtree.ElementTree as et
+from pjs.events import Dispatcher
 
 def borrow_parser(conn):
     """Borrow a parser from a pool of parsers"""
@@ -26,6 +27,7 @@ class IncrStreamParser:
         self._parser.EndElementHandler = self.handle_end
         self._parser.CharacterDataHandler = self.handle_text
         self._parser.buffer_text = 1 # single handle_text call per text node
+        self._parser.returns_unicode = 1 # handler funcs get unicode from expat
         
         self._names = {} # name memo cache. from ElementTree
         
@@ -39,6 +41,8 @@ class IncrStreamParser:
         self.depth = 0
         self.tree = None
         self.stream = None
+        self._names = {} # clear because this parser may be reused for another
+                         # stream
 
     def feed(self, data):
         """Read a chunk of data to parse. The complete XML in the chunk will
@@ -67,12 +71,12 @@ class IncrStreamParser:
         assert(self.depth >= 1)
         
         if self.depth == 1:
-            # handle <stream>, record it for XPath wrapping
-            
             # if starting a new stream, reset the old one
             if self.stream: self.reset()
+            
+            # handle <stream>, record it for XPath wrapping
             self.stream = et.Element(self._fixname(tag), attrs)
-            pass
+            #Dispatcher().dispatch(self.stream, self.conn, 'stream-init')
         elif self.depth == 2:
             # handle stanzas, build tree
             self.tree = et.TreeBuilder()
@@ -100,16 +104,20 @@ class IncrStreamParser:
             # TODO: handle errors
             self.tree = self.tree.close()
             # TODO: pass the el to the dispatcher for processing
+            Dispatcher().dispatch(self.tree, self.conn, 'test')
         else:
             # depth > 1. continue to build tree
             assert(self.tree)
             self.tree.end(self._fixname(tag))
 
     def handle_text(self, text):
-        """Handles the text node event."""
+        """Handles the text node event. Whitespace is ignored between stream
+        and stanza elements, but not inside the stanzas.
+        """
         # TODO: test on very large text node. Will expat's buffer overflow?
         
-        assert(self.tree)
+        if self.depth <= 1 and not text.strip():
+            return
         
         if self.depth <= 1:
             # TODO: there can't be any text between stanzas/streams, so maybe close the stream?
