@@ -28,12 +28,29 @@ class StreamInitHandler(Handler):
                                    'id' : id
                                    }
         
-        return "<?xml version='1.0'?>" + \
+        msg.addTextOutput(u"<?xml version='1.0'?>" + \
                 "<stream:stream from='%s' id='%s' xmlns='%s' "  \
                     % (msg.conn.server.hostname, id, ns) + \
                 "xmlns:stream='http://etherx.jabber.org/streams' " + \
-                "version='1.0'>"
+                "version='1.0'>")
+
+class FeaturesOutHandler(Handler):
+    """Handler for outgoing features. Announces the available features."""
+    def __init__(self):
+        pass
+    
+    def handle(self, tree, msg, lastRetVal=None):
+        res = u''
+        if lastRetVal:
+            res += lastRetVal
         
+        res += "<stream:features>" + \
+                "<mechanisms xmlns='urn:ietf:params:xml:ns:xmpp-sasl'>" + \
+                "<mechanism>PLAIN</mechanism>" + \
+                "</mechanisms></stream:features>"
+                
+        msg.addTextOutput(res)
+
 class StreamCloseHandler(Handler):
     """Handler for closing the stream"""
     def __init__(self):

@@ -11,7 +11,7 @@ phases = {
                        },
           'stream-init' : {
                            'description' : 'initializes stream data',
-                           'handlers' : [h['stream-init'], h['write']]
+                           'handlers' : [h['stream-init'], h['features-out'], h['write']]
                            },
           'features' : {
                         'description' : 'stream features such as TLS and resource binding',
@@ -35,7 +35,7 @@ phases = {
           'iq' : {
                   'description' : 'incoming IQ stanza',
                   'xpath' : '{jabber:client}iq',
-                  'handlers' : []
+                  'handlers' : [h['iq-not-implemented']]
                   },
           'message' : {
                        'description' : 'incoming message stanza',

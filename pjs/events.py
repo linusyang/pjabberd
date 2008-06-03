@@ -19,8 +19,19 @@ class Message:
         # indicates whether the last handler threw and exception
         self.gotException = False
         
+        # called by this object to notify the waiting handler that it can
+        # continue
         self.handlerResumeFunc = None
         
+        # for handlers to append to. the write handler will process this.
+        self.outputBuffer = u''
+        
+    def addTextOutput(self, data):
+        """Handlers can use this to buffer unicode text for output.
+        This will be sent by the write handler.
+        """
+        self.outputBuffer += unicode(data)
+    
     def process(self):
         """Runs the handlers"""
         

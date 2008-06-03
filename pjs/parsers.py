@@ -108,7 +108,7 @@ class IncrStreamParser:
             # TODO: handle errors
             self.tree = self.tree.close()
             # TODO: pass the el to the dispatcher for processing
-            Dispatcher().dispatch(self.tree, self.conn, 'test')
+            Dispatcher().dispatch(self.tree, self.conn)
         else:
             # depth > 1. continue to build tree
             assert(self.tree)

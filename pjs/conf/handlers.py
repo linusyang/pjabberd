@@ -20,6 +20,10 @@ handlers = {
                              'handler' : pjs.handlers.stream.StreamInitHandler,
                              'description' : 'initializes the stream'
                              },
+            'features-out' : {
+                              'handler' : pjs.handlers.stream.FeaturesOutHandler,
+                              'description' : 'sends out the available features'
+                              },
             'iq-not-implemented' : {
                                     'handler' : pjs.handlers.iq.IQNotImplementedHandler,
                                     'description' : 'returns a iq-not-implemented error'
