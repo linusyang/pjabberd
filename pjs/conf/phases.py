@@ -5,7 +5,9 @@ from pjs.conf.handlers import handlers as h
 # TODO: add functions to fetch phases from the config file
 # TODO: add ordering to phases, so that we can decide on conflicts
 
-phases = {
+
+# XMPP core phases (stream, init, db, sasl, tls, etc. no stanzas like iq/message/presence)
+corePhases = {
           'default' : {
                        'description' : 'default phase for when no other matches'
                        },
@@ -40,41 +42,6 @@ phases = {
                           'handlers' : [],
                           'errorHandlers' : [h['sasl-error']]
                           },
-#          'iq' : {
-#                  'description' : 'incoming IQ stanza',
-#                  'xpath' : '{jabber:client}iq',
-#                  'handlers' : [h['iq-not-implemented'], h['write']]
-#                  },
-          'iq-bind' : {
-                       'description' : 'client binding a resource',
-                       'xpath' : "{jabber:client}iq[@type='set']/{urn:ietf:params:xml:ns:xmpp-bind}bind",
-                       'handlers' : [h['iq-bind'], h['write']]
-                       },
-          'iq-session' : {
-                          'description' : 'client binding a session',
-                          'xpath' : "{jabber:client}iq[@type='set']/{urn:ietf:params:xml:ns:xmpp-session}session",
-                          'handlers' : [h['iq-session'], h['write']]
-                          },
-          'iq-disco-items' : {
-                        'description' : 'discovery',
-                        'xpath' : "{jabber:client}iq[@type='get']/{http://jabber.org/protocol/disco#items}query",
-                        'handlers' : [h['iq-not-implemented'], h['write']]
-                        },
-          'iq-disco-info' : {
-                        'description' : 'server info',
-                        'xpath' : "{jabber:client}iq[@type='get']/{http://jabber.org/protocol/disco#info}query",
-                        'handlers' : [h['iq-not-implemented'], h['write']]
-                        },
-          'message' : {
-                       'description' : 'incoming message stanza',
-                       'xpath' : '{jabber:client}message',
-                       'handlers' : []
-                       },
-          'presence' : {
-                        'description' : 'incoming presence stanza',
-                        'xpath' : '{jabber:client}presence',
-                        'handlers' : []
-                        },
           'db-result' : {
                          'description' : 'result of dialback coming from the other server',
                          'xpath' : '{jabber:server:dialback}result',
@@ -90,3 +57,40 @@ phases = {
                     'handlers' : [h['simple-reply'], h['write']]
                     }
           }
+
+# XMPP stanzas (iq/presence/message)
+stanzaPhases = {
+                'default' : {
+                             'description' : 'default phase for when no other matches'
+                             }, 
+                'iq-bind' : {
+                             'description' : 'client binding a resource', 
+                             'xpath' : "{jabber:client}iq[@type='set']/{urn:ietf:params:xml:ns:xmpp-bind}bind", 
+                             'handlers' : [h['iq-bind'], h['write']]
+                             },
+                'iq-session' : {
+                                'description' : 'client binding a session',
+                                'xpath' : "{jabber:client}iq[@type='set']/{urn:ietf:params:xml:ns:xmpp-session}session",
+                                'handlers' : [h['iq-session'], h['write']]
+                                },
+                'iq-disco-items' : {
+                                    'description' : 'discovery',
+                                    'xpath' : "{jabber:client}iq[@type='get']/{http://jabber.org/protocol/disco#items}query",
+                                    'handlers' : [h['iq-not-implemented'], h['write']]
+                                    },
+                'iq-disco-info' : {
+                                   'description' : 'server info',
+                                   'xpath' : "{jabber:client}iq[@type='get']/{http://jabber.org/protocol/disco#info}query",
+                                   'handlers' : [h['iq-not-implemented'], h['write']]
+                                   },
+                'message' : {
+                             'description' : 'incoming message stanza',
+                             'xpath' : '{jabber:client}message',
+                             'handlers' : []
+                             },
+                'presence' : {
+                              'description' : 'incoming presence stanza',
+                              'xpath' : '{jabber:client}presence',
+                              'handlers' : []
+                              }
+                }

@@ -1,5 +1,5 @@
 import pjs.handlers.base
-from pjs.conf.phases import phases
+from pjs.conf.phases import corePhases, stanzaPhases
 from pjs.conf.handlers import handlers as h
 
 class Message:
@@ -122,7 +122,7 @@ class _Dispatcher(object):
     uses the Singleton pattern.
     """
     def __init__(self):
-        pass
+        self.phasesList = corePhases
     
     def dispatch(self, tree, conn, knownPhase=None):
         """Dispatch a Message object to process the stanza.
@@ -133,19 +133,20 @@ class _Dispatcher(object):
         knownPhase -- the phase that this packet is in, if known.
         """
         phaseName = 'default'
-        phase = phases[phaseName]
+        phase = self.phasesList[phaseName]
         
-        if knownPhase and phases.has_key(knownPhase):
-            phase = phases[knownPhase]
+        if knownPhase and self.phasesList.has_key(knownPhase):
+            phase = self.phasesList[knownPhase]
             phaseName = knownPhase
         else:
             # loop through all phases to find the one who's XPath expr matches
             # the stanza
             # FIXME: this is likely to be a bottleneck
-            for p in phases:
-                if phases[p].has_key('xpath') and tree.find(phases[p]['xpath']) is not None:
-                    phase = phases[p]
+            for p in self.phasesList:
+                if self.phasesList[p].has_key('xpath') and tree.find(self.phasesList[p]['xpath']) is not None:
+                    phase = self.phasesList[p]
                     phaseName = p
+                    break
 
         # handlers get instantiated and loaded up into lists
         # TODO: watch for errors during instantiation
@@ -170,3 +171,12 @@ class _Dispatcher(object):
 
 _dispatcher = _Dispatcher()
 def Dispatcher(): return _dispatcher
+
+class _StanzaDispatcher(_Dispatcher):
+    """Stanza-specific dispatcher"""
+    
+    def __init__(self):
+        self.phasesList = stanzaPhases
+
+_stanzaDispatcher = _StanzaDispatcher()
+def StanzaDispatcher(): return _stanzaDispatcher

@@ -37,5 +37,5 @@ if __name__ == '__main__':
     c.execute("INSERT INTO users (jid, username, password) VALUES ('tro@localhost', 'tro', 'test')")
     c.close()
     
-    s = Server('localhost', 44444)
+    s = Server('localhost', 5222)
     pjs.async.core.loop()

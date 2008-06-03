@@ -1,9 +1,10 @@
 """ XML Stream parsers """
 
 from xml.parsers import expat
-from pjs.events import Dispatcher
-import pjs.elementtree.ElementTree as et
+from pjs.events import Dispatcher, StanzaDispatcher
 from copy import deepcopy
+import pjs.elementtree.ElementTree as et
+import re
 
 def borrow_parser(conn):
     """Borrow a parser from a pool of parsers"""
@@ -16,6 +17,8 @@ class IncrStreamParser:
     to call close() when done with the parser. If the stream isn't closed when
     close() is called, it will throw a xml.parsers.expat.ExpatError.
     """
+    
+    stanzaRe = re.compile(r'\b(iq|message|presence)\b', re.U | re.I)
 
     def __init__(self, conn=None):
         self.conn = conn
@@ -123,7 +126,10 @@ class IncrStreamParser:
             # in the <stream> element first
             tree = deepcopy(self.stream)
             tree.append(self.tree)
-            Dispatcher().dispatch(tree, self.conn)
+            if IncrStreamParser.stanzaRe.search(self.tree.tag):
+                StanzaDispatcher().dispatch(tree, self.conn)
+            else:
+                Dispatcher().dispatch(tree, self.conn)
         else:
             # depth > 1. continue to build tree
             assert(self.tree)
