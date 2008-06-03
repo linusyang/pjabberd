@@ -8,6 +8,9 @@ from pjs.async.core import dispatcher
 from pjs.utils import SynchronizedDict
 
 class Server(dispatcher):
+    """General server that accepts connections, creates threadpools and stores
+    some server-wide data.
+    """
     def __init__(self, ip, port, launcher):
         dispatcher.__init__(self)
         self.launcher = launcher
@@ -50,6 +53,7 @@ class Server(dispatcher):
         self.close()
 
 class C2SServer(Server):
+    """Server that handles incoming C2S connections from local clients"""
     def __init__(self, ip, port, launcher):
         Server.__init__(self, ip, port, launcher)
 
@@ -66,6 +70,9 @@ class C2SServer(Server):
         self.conns[conn.id] = (None, conn)
 
 class S2SServer(Server):
+    """Server that handles incoming S2S connections from local and remote
+    servers. It also is able to create outgoing S2S connections.
+    """
     def __init__(self, ip, port, launcher):
         Server.__init__(self, ip, port, launcher)
         self.data['info']['type'] = 's2s'
@@ -74,12 +81,14 @@ class S2SServer(Server):
         #self.s2sConns = SynchronizedDict()
         self.s2sConns = {}
         
-    def createOutConnection(self, sock):
+    def createRemoteOutConnection(self, sock):
+        """Creates an outgoing connection to a remote server"""
         conn = ServerOutConnection(sock, sock.getpeername(), self)
         self.conns[conn.id] = ('localhost-out', conn)
         return conn
     
-    def createLocalConnection(self, sock):
+    def createLocalOutConnection(self, sock):
+        """Creates an outgoing connection to a local server"""
         conn = LocalServerOutConnection(sock)
         self.conns[conn.id] = (conn.id, conn)
         self.s2sConns.setdefault('localhost', [None, None])[1] = conn

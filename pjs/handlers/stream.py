@@ -157,14 +157,14 @@ class NewS2SConnHandler(ThreadedHandler):
                 return
             
             if local:
-                conn = serv.createLocalConnection(sock)
+                conn = serv.createLocalOutConnection(sock)
                 # if we're connecting to ourselves, we don't need the <stream>.
                 # instead just send out the outQueue
                 data = d['new-s2s-conn'].get('queue')
                 if data is not None:
                     conn.send(prepareDataForSending(data))
             else:
-                sOutConn = serv.createOutConnection(sock)
+                sOutConn = serv.createRemoteOutConnection(sock)
             
                 # copy over any queued messages to send once fully connected
                 sOutConn.outQueue.extend(d['new-s2s-conn'].setdefault('queue', []))
