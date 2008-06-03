@@ -80,6 +80,10 @@ handlers = {
                              'description' : 'uses the last return value to push ' +\
                                              'the roster change to all connected resources'
                              },
+            'presence' : {
+                          'handler' : pjs.handlers.presence.PresenceHandler,
+                          'description' : 'handles plain presence notifications'
+                          },
             'subscription' : {
                               'handler' : pjs.handlers.presence.SubscriptionHandler,
                               'description' : 'takes care of subscriptions'

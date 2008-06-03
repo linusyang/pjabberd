@@ -5,9 +5,46 @@ from pjs.conf.handlers import handlers as h
 # TODO: add functions to fetch phases from the config file
 # TODO: add ordering to phases, so that we can decide on conflicts
 
+class PrioritizedDict(dict):
+    def __init__(self, d=None):
+        self.priolist = []
+        if d is not None:
+            dict.__init__(self, d)
+            self.reprioritize()
+        else:
+            dict.__init__(self)
+    def reprioritize(self):
+        self.priolist = dict.keys(self)
+        self.priolist.sort(cmp=self.compare)
+    def compare(self, x, y):
+        return dict.get(self, y).get('priority', 0) - dict.get(self, x).get('priority', 0)
+    def __iter__(self):
+        for i in self.priolist:
+            yield i
+    def __setitem__(self, key, value):
+        dict.__setitem__(self, key, value)
+        self.reprioritize()
+    def __delitem__(self, key):
+        dict.__delitem__(self, key)
+        self.reprioritize()
+    iterkeys = __iter__
+        
+#dd = {
+#      'a' : { 'name' : 'a', 'priority' : 1},
+#      'b' : { 'name' : 'b', 'priority' : 2},
+#      'c' : { 'name' : 'c',}
+#      }
+#d = PrioritizedDict()
+#d['a'] = { 'name' : 'a', 'priority' : 1}
+#d['b'] = { 'name' : 'b', 'priority' : 2}
+#d['c'] = { 'name' : 'c',}
+#
+#for i in d:
+#    print d[i]
+
 
 # XMPP core phases (stream, init, db, sasl, tls, etc. no stanzas like iq/message/presence)
-corePhases = {
+_corePhases = {
           'default' : {
                        'description' : 'default phase for when no other matches'
                        },
@@ -61,9 +98,10 @@ corePhases = {
                     'handlers' : [h['simple-reply'], h['write']]
                     }
           }
+corePhases = PrioritizedDict(_corePhases)
 
 # XMPP stanzas for client-to-server (iq/presence/message)
-c2sStanzaPhases = {
+_c2sStanzaPhases = {
     'default' : {
                  'description' : 'default phase for when no other matches'
                  }, 
@@ -102,20 +140,22 @@ c2sStanzaPhases = {
                  'xpath' : '{jabber:client}message',
                  'handlers' : []
                  },
-#    'presence' : {
-#                  'description' : 'incoming presence stanza',
-#                  'xpath' : '{jabber:client}presence',
-#                  'handlers' : []
-#                  },
+    'presence' : {
+                  'description' : 'incoming presence stanza',
+                  'xpath' : '{jabber:client}presence',
+                  'handlers' : [h['presence']],
+                  },
     'subscription' : {
                       'description' : 'subscription handling',
                       'xpath' : "{jabber:client}presence[@type]",
-                      'handlers' : [h['subscription']]
+                      'handlers' : [h['subscription']],
+                      'priority' : 1
                       }
     }
+c2sStanzaPhases = PrioritizedDict(_c2sStanzaPhases)
 
 # XMPP stanzas for server-to-server
-s2sStanzaPhases = {
+_s2sStanzaPhases = {
     'default' : {
                  'description' : 'default phase for when no other matches'
                  },
@@ -125,3 +165,4 @@ s2sStanzaPhases = {
                       'handlers' : []
                       }
     }
+s2sStanzaPhases = PrioritizedDict(_s2sStanzaPhases)
