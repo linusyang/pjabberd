@@ -1,3 +1,5 @@
+import pjs.threadpool
+
 class Handler:
     """Generic in-process handler (cannot block)"""
     def __init__(self):
@@ -46,3 +48,10 @@ class ThreadedHandler:
     def resume(self):
         """Called when the thread has finished running. Cannot block."""
         raise NotImplementedError, 'needs to be overridden in a subclass'
+
+def poll(threadpool):
+    """Polls the threadpool"""
+    try:
+        threadpool.poll()
+    except pjs.threadpool.NoResultsPending:
+        pass

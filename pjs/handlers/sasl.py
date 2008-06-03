@@ -6,7 +6,7 @@ import pjs.sasl_mechanisms as mechs
 import pjs.threadpool as threadpool
 import logging
 
-from pjs.handlers.base import Handler, ThreadedHandler
+from pjs.handlers.base import *
 from pjs.sasl_mechanisms import SASLError
 from pjs.utils import generateId, FunctionCall
 from pjs.elementtree.ElementTree import Element, tostring
@@ -16,7 +16,11 @@ class SASLAuthHandler(ThreadedHandler):
         self.done = False
     def handle(self, tree, msg, lastRetVal=None):
         """Handles SASL's <auth> element sent from the other side"""
+        
+        # this is true when the threaded handler returns
         self.done = False
+        
+        tpool = msg.conn.server.threadpool
         
         # the actual function executing in the thread
         def act(tree, msg):
@@ -43,20 +47,21 @@ class SASLAuthHandler(ThreadedHandler):
                 digest.handle(msg)
             else:
                 logging.warning("Mechanism %s not implemented", mech)
-                return
-        # we only need to let the checkFunc know that we're done
+            
         def cb(workReq, retVal):
             self.done = True
-        
+            
         req = threadpool.makeRequests(act,
-                                      [(None, {'tree' : tree, 'msg' : msg})], cb)
+                                 [(None, {'tree' : tree, 'msg' : msg})],
+                                 cb)
+        
+        def checkFunc():
+            # need to poll manually or the callback's never called from the pool
+            poll(tpool)
+            return self.done
         
         def initFunc():
-            """Start the thread"""
-            msg.conn.server.threadpool.putRequest(req[0])
-        def checkFunc():
-            msg.conn.server.threadpool.poll()
-            return self.done
+            tpool.putRequest(req[0])
         
         return FunctionCall(checkFunc), FunctionCall(initFunc)
         

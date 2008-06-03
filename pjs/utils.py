@@ -10,7 +10,7 @@ import time, os, re
 standardNSre = re.compile(r'^{jabber:(client|server)}', re.UNICODE)
 customNSre = re.compile(r'^{(.*?)}(.*)')
 
-# This is used in pjs.async.asyncore.
+# This is used in pjs.async.core.
 class FunctionCall:
     """Creates a simple object that represents the information required for a
     function call. Its main feature is that it is hashable, so it can be used
@@ -28,7 +28,7 @@ class FunctionCall:
         # of the parameters.
         self.hash = func.__str__()
         for k, v in funcArgs.items():
-            self.hash += k.__str__() + v.__str__()
+            self.hash += k.__repr__() + v.__repr__()
             
         self.hash = hash(self.hash)
         

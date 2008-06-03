@@ -4,7 +4,7 @@ import socket
 import logging
 import os, os.path, sys
 
-from pjs.connection import Connection
+from pjs.connection import Connection, LocalTriggerConnection
 from pjs.async.core import dispatcher
 from pjs.db import db
 
@@ -20,8 +20,14 @@ class Server(dispatcher):
         self.bind((ip, port))
         self.listen(5)
         
+        # see connection.LocalTriggerConnection.__doc__ 
+        self.localConn = LocalTriggerConnection(self.ip, self.port)
+        
+        def notifyFunc():
+            self.localConn.send(' ')
+        
         # TODO: make this configurable
-        self.threadpool = threadpool.ThreadPool(1)
+        self.threadpool = threadpool.ThreadPool(5, notifyFunc=notifyFunc)
         
     def handle_accept(self):
         sock, addr = self.accept()

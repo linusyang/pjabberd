@@ -199,7 +199,7 @@ def funcCheck():
         cb = func_map[f]
         
         try:
-            ret = f.func(*f.funcArgs)
+            ret = f.func(**f.funcArgs)
         except Exception, e:
             cb(e)
         
@@ -244,7 +244,7 @@ def wf(self, checkFunc, cb, initFunc=None):
     if (initFunc):
         assert(isinstance(initFunc, pjs.utils.FunctionCall))
         try:
-            initFunc.func(*initFunc.funcArgs)
+            initFunc.func(**initFunc.funcArgs)
         except Exception, e:
             cb(e)
             return

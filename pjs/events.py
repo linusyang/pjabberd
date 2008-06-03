@@ -64,7 +64,7 @@ class Message:
         """Resumes the execution of handlers. This is the callback for when
         the thread is done executing. It gets called by the Connection.
         """
-        if callable(self.handlerResumeFunc()):
+        if callable(self.handlerResumeFunc):
             self.handlerResumeFunc()
         self.process()
             

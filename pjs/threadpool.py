@@ -50,17 +50,21 @@ class WorkerThread(threading.Thread):
     one queue and puts the results in another until it is dismissed.
     """
 
-    def __init__(self, requestsQueue, resultsQueue, **kwds):
-        """Set up thread in damonic mode and start it immediatedly.
+    def __init__(self, requestsQueue, resultsQueue, notifyFunc=None, **kwds):
+        """Set up thread in daemonic mode and start it immediately.
 
         requestsQueue and resultQueue are instances of Queue.Queue passed
         by the ThreadPool class when it creates a new worker thread.
+        notifyFunc is executed when done. see
+        connection.LocalTriggerConnection.__doc__
         """
         threading.Thread.__init__(self, **kwds)
         self.setDaemon(1)
         self.workRequestQueue = requestsQueue
         self.resultQueue = resultsQueue
         self._dismissed = threading.Event()
+        # called when finished
+        self.notifyFunc = notifyFunc
         self.start()
 
     def run(self):
@@ -78,6 +82,11 @@ class WorkerThread(threading.Thread):
             self.resultQueue.put(
                 (request, request.callable(*request.args, **request.kwds))
             )
+            
+            # Wake up asyncore
+            # see connection.LocalTriggerConnection.__doc__
+            if self.notifyFunc:
+                self.notifyFunc()
 
     def dismiss(self):
         """Sets a flag to tell the thread to exit when done with current job.
@@ -126,15 +135,18 @@ class ThreadPool:
     See the module doctring for more information.
     """
 
-    def __init__(self, num_workers, q_size=0):
+    def __init__(self, num_workers, q_size=0, notifyFunc=None):
         """Set up the thread pool and start num_workers worker threads.
 
         num_workers is the number of worker threads to start initialy.
         If q_size > 0 the size of the work request is limited and the
         thread pool blocks when queue is full and it tries to put more
         work requests in it.
+        notifyFunc is executed by each WorkThread when it's done. see
+        connection.LocalTriggerConnection.__doc__
         """
 
+        self.notifyFunc = notifyFunc
         self.requestsQueue = Queue.Queue(q_size)
         self.resultsQueue = Queue.Queue()
         self.workers = []
@@ -146,7 +158,7 @@ class ThreadPool:
 
         for i in range(num_workers):
             self.workers.append(WorkerThread(self.requestsQueue,
-              self.resultsQueue))
+              self.resultsQueue, self.notifyFunc))
 
     def dismissWorkers(self, num_workers):
         """Tell num_workers worker threads to to quit when they're done."""
@@ -188,6 +200,10 @@ class ThreadPool:
                 self.poll(True)
             except NoResultsPending:
                 break
+            
+    def __repr__(self):
+        return '<ThreadPool object at %s>' % id(self)
+    __str__ = __repr__
 
 def makeRequests(callable, args_list, callback=None):
     """Convenience function for building several work requests for the same
