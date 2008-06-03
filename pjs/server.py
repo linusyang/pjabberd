@@ -1,4 +1,5 @@
 import pjs.async.core
+import pjs.threadpool as threadpool
 import socket
 import logging
 import os, os.path, sys
@@ -18,6 +19,9 @@ class Server(dispatcher):
         self.set_reuse_addr()
         self.bind((ip, port))
         self.listen(5)
+        
+        # TODO: make this configurable
+        self.threadpool = threadpool.ThreadPool(1)
         
     def handle_accept(self):
         sock, addr = self.accept()

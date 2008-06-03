@@ -3,40 +3,64 @@
 # license.
 
 import pjs.sasl_mechanisms as mechs
+import pjs.threadpool as threadpool
 import logging
 
-from pjs.handlers.base import Handler
+from pjs.handlers.base import Handler, ThreadedHandler
 from pjs.sasl_mechanisms import SASLError
-from pjs.utils import generateId
+from pjs.utils import generateId, FunctionCall
 from pjs.elementtree.ElementTree import Element, tostring
 
-class SASLAuthHandler(Handler):
-    """Handles SASL's <auth> element sent from the other side"""
+class SASLAuthHandler(ThreadedHandler):
+    def __init__(self):
+        self.done = False
     def handle(self, tree, msg, lastRetVal=None):
-        mech = tree[0].get('mechanism')
+        """Handles SASL's <auth> element sent from the other side"""
+        self.done = False
         
-        if not msg.conn.data.has_key('sasl'):
-            msg.conn.data['sasl'] = {
-                                     'mech' : '',
-                                     'challenge' : '',
-                                     'stage' : 0,
-                                     'complete' : False
-                                     }
+        # the actual function executing in the thread
+        def act(tree, msg):
+            mech = tree[0].get('mechanism')
+            
+            if not msg.conn.data.has_key('sasl'):
+                msg.conn.data['sasl'] = {
+                                         'mech' : '',
+                                         'challenge' : '',
+                                         'stage' : 0,
+                                         'complete' : False
+                                         }
+            
+            if mech == 'PLAIN':
+                msg.conn.data['sasl']['mech'] = 'PLAIN'
+                authtext64 = tree[0].text
+                plain = mechs.Plain(msg)
+                msg.conn.data['sasl']['mechObj'] = plain
+                plain.handle(authtext64)
+            elif mech == 'DIGEST-MD5':
+                msg.conn.data['sasl']['mech'] = 'DIGEST-MD5'
+                digest = mechs.DigestMD5(msg)
+                msg.conn.data['sasl']['mechObj'] = digest
+                digest.handle(msg)
+            else:
+                logging.warning("Mechanism %s not implemented", mech)
+                return
+        # we only need to let the checkFunc know that we're done
+        def cb(workReq, retVal):
+            self.done = True
         
-        if mech == 'PLAIN':
-            msg.conn.data['sasl']['mech'] = 'PLAIN'
-            authtext64 = tree[0].text
-            plain = mechs.Plain(msg)
-            msg.conn.data['sasl']['mechObj'] = plain
-            plain.handle(authtext64)
-        elif mech == 'DIGEST-MD5':
-            msg.conn.data['sasl']['mech'] = 'DIGEST-MD5'
-            digest = mechs.DigestMD5(msg)
-            msg.conn.data['sasl']['mechObj'] = digest
-            digest.handle(msg)
-        else:
-            logging.warning("Mechanism %s not implemented", mech)
-            return
+        req = threadpool.makeRequests(act,
+                                      [(None, {'tree' : tree, 'msg' : msg})], cb)
+        
+        def initFunc():
+            """Start the thread"""
+            msg.conn.server.threadpool.putRequest(req[0])
+        def checkFunc():
+            msg.conn.server.threadpool.poll()
+            return self.done
+        
+        return FunctionCall(checkFunc), FunctionCall(initFunc)
+        
+    def resume(self): pass
         
 class SASLResponseHandler(Handler):
     """Handles SASL's <response> element sent from the other side"""

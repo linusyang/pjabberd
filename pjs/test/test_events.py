@@ -132,16 +132,20 @@ class SimpleThreadedHandler(pjs.handlers.base.ThreadedHandler):
         self.threadpool = threadpool
     def handle(self, tree, msg, lastRetVal=None):
         def sleep(arg):
+            """This is the actual function executing in the thread"""
             # time.sleep(10) # this also worked but slows down tests
             return 'success'
         def cb(workReq, retVal):
+            """Asyncore calls this back when checkFunc returns true"""
             self.passed = retVal
         req = pjs.threadpool.makeRequests(sleep, [([0], None)], cb)
         
         def checkFunc():
+            """Asyncore will run this regularly and call cb when true"""
             return self.passed
         
         def initFunc():
+            """Asyncore will execute this function before checkFunc"""
             [self.threadpool.putRequest(r) for r in req]
         
         return FunctionCall(checkFunc), FunctionCall(initFunc)
