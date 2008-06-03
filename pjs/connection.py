@@ -42,9 +42,15 @@ class Connection(asyncore.dispatcher_with_send):
         logging.info("New connection accepted from %s", self.addr)
         
     def handle_expt(self):
-        logging.warning("Socket exception occured for %s", self.addr) 
+        logging.warning("Socket exception occured for %s", self.addr)
+        self.handle_close()
     
     def handle_close(self):
+        # this resource is no longer connected
+        jid = self.data['user']['jid']
+        resource = self.data['user']['resource']
+        del self.server.data['resources'][jid][resource]
+        
         try:
             self.parser.close()
         except:
