@@ -1,3 +1,5 @@
+"""<message>-related handlers"""
+
 import logging
 import pjs.threadpool as threadpool
 
@@ -9,29 +11,32 @@ from pjs.jid import JID
 from copy import copy
 
 class C2SMessageHandler(Handler):
+    """Receives a message from a client on our server and schedules a
+    server-routing handler.
+    """
     def handle(self, tree, msg, lastRetVal=None):
         # check that we have the to and from fields in the message and
         # just forward
         toJID = tree.get('to')
         jid = msg.conn.data['user']['jid']
         resource = msg.conn.data['user']['resource']
-        
+
         try:
             toJID = JID(toJID)
         except:
             logging.debug("[%s] 'to' attribute in message not a real JID",
                           self.__class__)
             return
-        
+
         stampedTree = copy(tree)
         stampedTree.set('from', '%s/%s' % (jid, resource))
-        
+
         routeData = {
                      'to' : toJID.__str__(),
                      'data' : stampedTree
                      }
         msg.setNextHandler('route-server')
-        
+
         return chainOutput(lastRetVal, routeData)
 
 class S2SMessageHandler(ThreadedHandler):
@@ -41,12 +46,12 @@ class S2SMessageHandler(ThreadedHandler):
         self.done = False
         # used to pass the output to the next handler
         self.retVal = None
-        
+
     def handle(self, tree, msg, lastRetVal=None):
         self.done = False
         self.retVal = lastRetVal
         tpool = msg.conn.server.threadpool
-        
+
         def act():
             cjid = tree.get('from')
             if not cjid:
@@ -54,7 +59,7 @@ class S2SMessageHandler(ThreadedHandler):
                               "stanza from server. Dropping: %s",
                               self.__class__, tostring(tree))
                 return
-            
+
             try:
                 cjid = JID(cjid)
             except Exception, e:
@@ -62,13 +67,13 @@ class S2SMessageHandler(ThreadedHandler):
                               "real JID: %s. Dropping: %s",
                               self.__class__, cjid, tostring(tree))
                 return
-            
+
             to = tree.get('to')
             if not to:
                 logging.debug("[%s] No 'to' attribute in <message> stanza from server",
                               self.__class__)
                 return
-            
+
             try:
                 to = JID(to)
             except Exception, e:
@@ -76,13 +81,13 @@ class S2SMessageHandler(ThreadedHandler):
                               "real JID: %s. Dropping: %s",
                               self.__class__, to, tostring(tree))
                 return
-            
+
             if to.domain != msg.conn.server.hostname:
                 logging.debug("[%s] <message> stanza recipient not handled " +\
                               "by this server: %s",
                               self.__class__, tostring(msg))
                 return
-            
+
             def makeServiceUnavailableError():
                 fromJID = cjid.__str__()
                 reply = Element('message', {
@@ -100,17 +105,17 @@ class S2SMessageHandler(ThreadedHandler):
                              }
                 msg.setNextHandler('route-client')
                 return chainOutput(lastRetVal, routeData)
-            
+
             if to.exists():
                 # user exists in the DB. check if they're online,
                 # then forward to server
                 conns = msg.conn.server.launcher.getC2SServer().data['resources']
                 toJID = to.getBare()
-                
+
                 # we may need to strip the resource if it's not available
                 # and send to the bare JID
                 modifiedTo = to.__str__()
-                
+
                 if conns.has_key(toJID) and conns[toJID]:
                     # the user has one or more resources available
                     if to.resource:
@@ -125,8 +130,8 @@ class S2SMessageHandler(ThreadedHandler):
                     if tree.get('type') == 'error':
                         return
                     return makeServiceUnavailableError()
-                    
-                
+
+
                 routeData = {
                              'to' : modifiedTo,
                              'data' : tree
@@ -136,14 +141,14 @@ class S2SMessageHandler(ThreadedHandler):
             else:
                 # user does not exist
                 # reply with <service-unavailable>.
-                
+
                 if tree.get('type') == 'error':
                     # unless this message was an error itself
                     return
-                
+
                 return makeServiceUnavailableError()
-                
-        
+
+
         def cb(workReq, retVal):
             self.done = True
             # make sure we pass the lastRetVal along
@@ -151,18 +156,18 @@ class S2SMessageHandler(ThreadedHandler):
                 self.retVal = lastRetVal
             else:
                 self.retVal = retVal
-        
+
         req = threadpool.makeRequests(act, None, cb)
-        
+
         def checkFunc():
             # need to poll manually or the callback's never called from the pool
             poll(tpool)
             return self.done
-        
+
         def initFunc():
             tpool.putRequest(req[0])
-        
+
         return FunctionCall(checkFunc), FunctionCall(initFunc)
-    
+
     def resume(self):
         return self.retVal

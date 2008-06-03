@@ -1,4 +1,11 @@
-"""List of handlers and their descriptions"""
+"""List of handlers and their descriptions. This is modifiable at run-time.
+See phases.py for where these handlers are actually used.
+
+See the design doc for information about chained handlers.
+"""
+
+# TODO needs to be thread-safe, so maybe introduce functions for retrieving
+# the handlers that do some locking.
 
 import pjs.handlers.write
 import pjs.handlers.simple

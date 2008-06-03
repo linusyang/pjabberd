@@ -1,3 +1,5 @@
+"""<presence>-related handlers"""
+
 import logging
 import pjs.threadpool as threadpool
 
@@ -20,25 +22,25 @@ class C2SPresenceHandler(ThreadedHandler):
         self.done = False
         # used to pass the output to the next handler
         self.retVal = None
-        
+
     def handle(self, tree, msg, lastRetVal=None):
         self.done = False
         self.retVal = lastRetVal
         tpool = msg.conn.server.threadpool
-        
+
         def act():
             d = msg.conn.data
-            
+
             retVal = lastRetVal
-            
+
             jid = d['user']['jid']
             resource = d['user']['resource']
-            
+
             roster = Roster(jid)
-            
+
             presTree = deepcopy(tree)
             presTree.set('from', '%s/%s' % (jid, resource))
-            
+
             probes = []
             if tree.get('to') is None and not d['user']['active']:
                 # initial presence
@@ -46,16 +48,16 @@ class C2SPresenceHandler(ThreadedHandler):
                 # data after the first resource is active and just resend
                 # that to all new resources
                 d['user']['active'] = True
-                
+
                 # get jids of the contacts whose status we're interested in
                 cjids = roster.getPresenceSubscriptions()
-                
+
                 probeTree = Element('presence', {
                                                  'type': 'probe',
                                                  'from' : '%s/%s' \
                                                     % (jid, resource)
                                                  })
-                
+
                 # TODO: replace this with a more efficient router handler
                 for cjid in cjids:
                     probeTree.set('to', cjid)
@@ -65,10 +67,10 @@ class C2SPresenceHandler(ThreadedHandler):
                                       }
                     probes.append(probeRouteData)
                     # they're sent first. see below
-                    
+
                 # broadcast to other resources of this user
                 retVal = self.broadcastToOtherResources(presTree, msg, retVal, jid, resource)
-                
+
             elif tree.get('to') is not None:
                 # TODO: directed presence
                 return
@@ -76,15 +78,15 @@ class C2SPresenceHandler(ThreadedHandler):
                 # broadcast to other resources of this user
                 d['user']['active'] = False
                 retVal = self.broadcastToOtherResources(presTree, msg, retVal, jid, resource)
-            
+
             # record this stanza as the last presence sent from this client
             lastPresence = deepcopy(tree)
             lastPresence.set('from', '%s/%s' % (jid, resource))
             d['user']['lastPresence'] = lastPresence
-            
+
             # lookup contacts interested in presence
             cjids = roster.getPresenceSubscribers()
-            
+
             # TODO: replace this with another router handler that would send
             # it out to all cjids in a batch instead of queuing a handler
             # for each
@@ -96,14 +98,14 @@ class C2SPresenceHandler(ThreadedHandler):
                      }
                 retVal = chainOutput(retVal, presRouteData)
                 msg.setNextHandler('route-server')
-                
+
             # send the probes first
             for probe in probes:
                 msg.setNextHandler('route-server')
                 retVal = chainOutput(retVal, probe)
-                
+
             return retVal
-        
+
         def cb(workReq, retVal):
             self.done = True
             # make sure we pass the lastRetVal along
@@ -111,35 +113,35 @@ class C2SPresenceHandler(ThreadedHandler):
                 self.retVal = lastRetVal
             else:
                 self.retVal = retVal
-        
+
         req = threadpool.makeRequests(act, None, cb)
-        
+
         def checkFunc():
             # need to poll manually or the callback's never called from the pool
             poll(tpool)
             return self.done
-        
+
         def initFunc():
             tpool.putRequest(req[0])
-        
+
         return FunctionCall(checkFunc), FunctionCall(initFunc)
-    
+
     def resume(self):
         return self.retVal
-    
+
     def broadcastToOtherResources(self, tree, msg, lastRetVal,
                                   jid=None, resource=None):
         """Takes in the stanza to broadcast to other resources of this
         user and sets the next handler to route-server. Returns the
         lastRetVal with chained route-server handlers.
-        
+
         tree -- tree to modify with the 'to' address and send out
         """
         jid = jid or msg.conn.data['user']['jid']
         resource = resource or msg.conn.data['user']['resource']
-        
+
         retVal = lastRetVal
-        
+
         resources = msg.conn.server.data['resources'][jid]
         for r in resources:
             if r != resource:
@@ -151,9 +153,9 @@ class C2SPresenceHandler(ThreadedHandler):
                      }
                 retVal = chainOutput(lastRetVal, presRouteData)
                 msg.setNextHandler('route-server')
-                
+
         return retVal
-    
+
 class S2SPresenceHandler(Handler):
     """Handles plain <presence> (without type) sent by the servers"""
     def handle(self, tree, msg, lastRetVal=None):
@@ -164,7 +166,7 @@ class S2SPresenceHandler(Handler):
             res = conn.data['user']['resource']
             data.set('to', '%s/%s' % (jid, res))
             return data
-        
+
         logging.debug("[%s] Routing %s", self.__class__, tostring(tree))
         d = {
              'to' : tree.get('to'),
@@ -173,7 +175,7 @@ class S2SPresenceHandler(Handler):
              }
         msg.setNextHandler('route-client')
         return chainOutput(lastRetVal, d)
-    
+
 class S2SProbeHandler(Handler):
     """Handles <presence type="probe"/> sent by the servers"""
     def handle(self, tree, msg, lastRetVal=None):
@@ -188,7 +190,7 @@ class S2SProbeHandler(Handler):
         resources = jids.get(jid.getBare())
         if not resources:
             return
-        
+
         lastPresences = []
         for res, con in resources.items():
             lp = con.data['user']['lastPresence']
@@ -197,7 +199,7 @@ class S2SProbeHandler(Handler):
                 # modify the copy to include the 'to' attr for s2s routing
                 lpcopy.set('to', tree.get('from'))
                 lastPresences.append(lpcopy)
-                
+
         if lastPresences:
             d = {
                  'to' : tree.get('from'),
@@ -205,7 +207,7 @@ class S2SProbeHandler(Handler):
                  }
             msg.setNextHandler('route-server')
             return chainOutput(lastRetVal, d)
-    
+
 class S2SSubscriptionHandler(ThreadedHandler):
     """Handles subscriptions sent from servers within <presence> stanzas.
     ie. <presence> elements with types.
@@ -215,13 +217,13 @@ class S2SSubscriptionHandler(ThreadedHandler):
         self.done = False
         # used to pass the output to the next handler
         self.retVal = None
-        
+
     def handle(self, tree, msg, lastRetVal=None):
         self.done = False
         self.retVal = lastRetVal
-        
+
         tpool = msg.conn.server.threadpool
-        
+
         def act():
             # get the contact's jid
             fromAddr = tree.get('from')
@@ -231,7 +233,7 @@ class S2SSubscriptionHandler(ThreadedHandler):
                 logging.warning("[%s] 'from' JID is not properly formatted. Tree: %s",
                                 self.__class__, tostring(tree))
                 return
-            
+
             # get the user's jid
             toAddr = tree.get('to')
             try:
@@ -240,14 +242,14 @@ class S2SSubscriptionHandler(ThreadedHandler):
                 logging.warning("[%s] 'to' JID is not properly formatted. Tree: %s",
                                 self.__class__, tostring(tree))
                 return
-            
+
             roster = Roster(jid.getBare())
-            
+
             doRoute = False
 
             cinfo = roster.getContactInfo(cjid.getBare())
             subType = tree.get('type')
-            
+
             retVal = lastRetVal
 
             # S2S SUBSCRIBE
@@ -269,7 +271,7 @@ class S2SSubscriptionHandler(ThreadedHandler):
                         roster.setSubscription(cinfo.id, Subscription.NONE_PENDING_IN_OUT)
                     elif cinfo.subscription == Subscription.TO:
                         roster.setSubscription(cinfo.id, Subscription.TO_PENDING_IN)
-                        
+
                     doRoute = True
                 elif cinfo.subscription in (Subscription.FROM,
                                             Subscription.FROM_PENDING_OUT,
@@ -284,9 +286,9 @@ class S2SSubscriptionHandler(ThreadedHandler):
                          }
                     retVal = chainOutput(retVal, subscribedRouting)
                     msg.setNextHandler('route-server')
-                
+
                 # ignore presence in other states
-                
+
                 if doRoute:
                     # queue the stanza for delivery
                     stanzaRouting = {
@@ -295,7 +297,7 @@ class S2SSubscriptionHandler(ThreadedHandler):
                                      }
                     retVal = chainOutput(retVal, stanzaRouting)
                     msg.setNextHandler('route-client')
-                    
+
                 return retVal
 
             # S2S SUBSCRIBED
@@ -316,7 +318,7 @@ class S2SSubscriptionHandler(ThreadedHandler):
                         elif cinfo.subscription == Subscription.FROM_PENDING_OUT:
                             roster.setSubscription(cinfo.id, Subscription.BOTH)
                             subscription = Subscription.BOTH
-                        
+
                         # forward the subscribed presence
                         # prepare the presence data for routing
                         d = {
@@ -324,25 +326,25 @@ class S2SSubscriptionHandler(ThreadedHandler):
                              'data' : tree,
                              }
                         retVal = chainOutput(retVal, d)
-                            
+
                         # create an updated roster item for roster push
                         query = Roster.createRosterQuery(cinfo.jid,
                                     Subscription.getPrimaryNameFromState(subscription),
                                     cinfo.name, cinfo.groups)
-                        
+
                         routeData = {}
                         conns = msg.conn.server.launcher.getC2SServer().data['resources']
                         bareJID = jid.getBare()
                         if conns.has_key(bareJID):
                             routeData['jid'] = bareJID
                             routeData['resources'] = conns[bareJID]
-                        
+
                         # next handlers (reverse order)
                         msg.setNextHandler('route-client')
                         msg.setNextHandler('roster-push')
-                        
+
                         return chainOutput(retVal, (routeData, query))
-                        
+
             # S2S UNSUBSCRIBE
             elif subType == 'unsubscribe':
 
@@ -363,9 +365,9 @@ class S2SSubscriptionHandler(ThreadedHandler):
                           or subscription == Subscription.BOTH:
                             roster.setSubscription(cinfo.id, Subscription.TO)
                             subscription = Subscription.TO
-                            
+
                         # these steps are really in reverse order due to handler queuing
-                        
+
                         # send unavailable presence from all resources
                         resources = msg.conn.server.launcher.getC2SServer().data['resources']
                         bareJID = jid.getBare()
@@ -383,7 +385,7 @@ class S2SSubscriptionHandler(ThreadedHandler):
                             retVal = chainOutput(retVal, unavailableRouting)
                             # 4. route the unavailable presence back to server
                             msg.setNextHandler('route-server')
-                            
+
                         # auto-reply with "unsubscribed" stanza
                         out = "<presence to='%s' from='%s' type='unsubscribed'/>" % (cjid.getBare(), jid.getBare())
                         unsubscribedRouting = {
@@ -391,14 +393,14 @@ class S2SSubscriptionHandler(ThreadedHandler):
                                                'data' : out
                                                }
                         retVal = chainOutput(retVal, unsubscribedRouting)
-                        
+
                         # prepare the unsubscribe presence data for routing to client
                         unsubscribeRouting = {
                              'to' : jid,
                              'data' : tree,
                              }
                         retVal = chainOutput(retVal, unsubscribeRouting)
-                        
+
                         # create an updated roster item for roster push
                         # we should really create add an ask='subscribe' for
                         # the NONE_PENDING_OUT state, but the spec doesn't
@@ -406,7 +408,7 @@ class S2SSubscriptionHandler(ThreadedHandler):
                         query = Roster.createRosterQuery(cinfo.jid,
                                     Subscription.getPrimaryNameFromState(subscription),
                                     cinfo.name, cinfo.groups)
-                        
+
                         # needed for S2S roster push
                         routeData = {}
                         conns = msg.conn.server.launcher.getC2SServer().data['resources']
@@ -414,7 +416,7 @@ class S2SSubscriptionHandler(ThreadedHandler):
                         if conns.has_key(bareJID):
                             routeData['jid'] = bareJID
                             routeData['resources'] = conns[bareJID]
-                        
+
                         # handlers in reverse order. actual order:
                         # 1. push the updated roster
                         # 2. route the unsubscribe presence to client
@@ -424,9 +426,9 @@ class S2SSubscriptionHandler(ThreadedHandler):
                         msg.setNextHandler('route-server')
                         msg.setNextHandler('route-client')
                         msg.setNextHandler('roster-push')
-                        
+
                         return chainOutput(retVal, (routeData, query))
-                        
+
             # S2S UNSUBSCRIBED
             elif subType == 'unsubscribed':
 
@@ -448,19 +450,19 @@ class S2SSubscriptionHandler(ThreadedHandler):
                           or subscription == Subscription.BOTH:
                             roster.setSubscription(cinfo.id, Subscription.FROM)
                             subscription = Subscription.FROM
-                        
+
                         # prepare the unsubscribed presence data for routing
                         d = {
                              'to' : jid,
                              'data' : tree,
                              }
                         retVal = chainOutput(retVal, d)
-                        
+
                         # create an updated roster item for roster push
                         query = Roster.createRosterQuery(cinfo.jid,
                                     Subscription.getPrimaryNameFromState(subscription),
                                     cinfo.name, cinfo.groups)
-                        
+
                         # needed for S2S roster push
                         routeData = {}
                         conns = msg.conn.server.launcher.getC2SServer().data['resources']
@@ -468,14 +470,14 @@ class S2SSubscriptionHandler(ThreadedHandler):
                         if conns.has_key(bareJID):
                             routeData['jid'] = bareJID
                             routeData['resources'] = conns[bareJID]
-                        
+
                         # handlers in reverse order
                         # actually: push roster first, then route presence
                         msg.setNextHandler('route-client')
                         msg.setNextHandler('roster-push')
-                        
+
                         return chainOutput(retVal, (routeData, query))
-            
+
         def cb(workReq, retVal):
             self.done = True
             # make sure we pass the lastRetVal along
@@ -483,19 +485,19 @@ class S2SSubscriptionHandler(ThreadedHandler):
                 self.retVal = lastRetVal
             else:
                 self.retVal = retVal
-        
+
         req = threadpool.makeRequests(act, None, cb)
-        
+
         def checkFunc():
             # need to poll manually or the callback's never called from the pool
             poll(tpool)
             return self.done
-        
+
         def initFunc():
             tpool.putRequest(req[0])
-        
+
         return FunctionCall(checkFunc), FunctionCall(initFunc)
-    
+
     def resume(self):
         return self.retVal
 
@@ -508,29 +510,29 @@ class C2SSubscriptionHandler(ThreadedHandler):
         self.done = False
         # used to pass the output to the next handler
         self.retVal = None
-        
+
     def handle(self, tree, msg, lastRetVal=None):
         self.done = False
         self.retVal = lastRetVal
-        
+
         tpool = msg.conn.server.threadpool
-        
+
         def act():
             # TODO: verify that it's coming from a known user
             jid = msg.conn.data['user']['jid']
             cjid = JID(tree.get('to'))
             type = tree.get('type')
-            
+
             if not cjid:
                 logging.warning('[%s] No contact jid specified in subscription ' +\
                                 'query. Tree: %s', self.__class__, tree)
                 # TODO: throw exception here
                 return
-            
+
             roster = Roster(jid)
             # get the RosterItem
             cinfo = roster.getContactInfo(cjid.getBare())
-            
+
             retVal = lastRetVal
 
             # C2S SUBSCRIBE
@@ -544,7 +546,7 @@ class C2SSubscriptionHandler(ThreadedHandler):
                     # section 8.2 bullet 4 we MUST create a new roster entry
                     # for it with empty name and groups.
                     roster.updateContact(cjid.getBare())
-                    
+
                     # now refetch the contact info
                     cinfo = roster.getContactInfo(cjid.getBare())
 
@@ -552,7 +554,7 @@ class C2SSubscriptionHandler(ThreadedHandler):
                 name = cinfo.name
                 subscription = cinfo.subscription
                 groups = cinfo.groups
-                
+
                 # update the subscription state
                 if subscription == Subscription.NONE:
                     roster.setSubscription(cid, Subscription.NONE_PENDING_OUT)
@@ -563,7 +565,7 @@ class C2SSubscriptionHandler(ThreadedHandler):
                 elif subscription == Subscription.FROM:
                     roster.setSubscription(cid, Subscription.FROM_PENDING_OUT)
                     subscription = Subscription.FROM_PENDING_OUT
-                
+
                 # send a roster push with ask
                 query = Roster.createRosterQuery(cjid.getBare(),
                             Subscription.getPrimaryNameFromState(subscription),
@@ -572,20 +574,20 @@ class C2SSubscriptionHandler(ThreadedHandler):
                 # stamp presence with 'from' JID
                 treeCopy = deepcopy(tree)
                 treeCopy.set('from', jid)
-                
+
                 # prepare the presence data for routing
                 d = {
                      'to' : cjid,
                      'data' : treeCopy,
                      }
                 retVal = chainOutput(retVal, d)
-                
+
                 # sequence of events in reverse order
                 # push the roster first, in case we have to create a new
                 # s2s connection
                 msg.setNextHandler('route-server')
                 msg.setNextHandler('roster-push')
-                
+
                 return chainOutput(retVal, query)
 
             # C2S SUBSCRIBED
@@ -609,18 +611,18 @@ class C2SSubscriptionHandler(ThreadedHandler):
                         elif cinfo.subscription == Subscription.TO_PENDING_IN:
                             roster.setSubscription(cinfo.id, Subscription.BOTH)
                             subscription = Subscription.BOTH
-                            
+
                         # roster stanza
                         query = Roster.createRosterQuery(cjid.getBare(),
                                     Subscription.getPrimaryNameFromState(subscription),
                                     cinfo.name, cinfo.groups)
-                            
+
                         # stamp presence with 'from'
                         treeCopy = deepcopy(tree)
                         treeCopy.set('from', jid)
-                        
+
                         toRoute = tostring(treeCopy)
-                        
+
                         # create available presence stanzas for all resources of the user
                         resources = msg.conn.server.launcher.getC2SServer().data['resources']
                         jidForResources = resources.has_key(jid) and resources[jid]
@@ -631,18 +633,18 @@ class C2SSubscriptionHandler(ThreadedHandler):
                                 out += " to='%s'/>" % cjid.getBare()
                             # and queue for routing
                             toRoute += out
-                        
+
                         # prepare the presence data for routing
                         d = {
                              'to' : cjid,
                              'data' : toRoute,
                              }
                         retVal = chainOutput(retVal, d)
-                        
+
                         # next handlers in reverse order
                         msg.setNextHandler('route-server')
                         msg.setNextHandler('roster-push')
-                        
+
                         return chainOutput(retVal, query)
 
             # C2S UNSUBSCRIBE
@@ -657,14 +659,14 @@ class C2SSubscriptionHandler(ThreadedHandler):
                     # stamp presence with 'from'
                     treeCopy = deepcopy(tree)
                     treeCopy.set('from', jid)
-                    
+
                     # prepare the presence data for routing
                     d = {
                          'to' : cjid,
                          'data' : treeCopy,
                          }
                     msg.setNextHandler('route-server')
-                    
+
                     return chainOutput(retVal, d)
                 else:
                     subscription = cinfo.subscription
@@ -683,27 +685,27 @@ class C2SSubscriptionHandler(ThreadedHandler):
                           or subscription == Subscription.TO_PENDING_IN:
                             roster.setSubscription(cinfo.id, Subscription.NONE_PENDING_IN)
                             subscription = Subscription.NONE_PENDING_IN
-                        
+
                     # roster stanza
                     query = Roster.createRosterQuery(cjid.getBare(),
                                 Subscription.getPrimaryNameFromState(subscription),
                                 cinfo.name, cinfo.groups)
-                    
+
                     # stamp presence with 'from'
                     treeCopy = deepcopy(tree)
                     treeCopy.set('from', jid)
-                    
+
                     # prepare the presence data for routing
                     d = {
                          'to' : cjid,
                          'data' : treeCopy,
                          }
                     retVal = chainOutput(retVal, d)
-                    
+
                     # schedules handlers in reverse order
                     msg.setNextHandler('route-server')
                     msg.setNextHandler('roster-push')
-                    
+
                     return chainOutput(retVal, query)
 
             # C2S UNSUBSCRIBED
@@ -729,7 +731,7 @@ class C2SSubscriptionHandler(ThreadedHandler):
                           or subscription == Subscription.BOTH:
                             roster.setSubscription(cinfo.id, Subscription.TO)
                             subscription = Subscription.TO
-                            
+
                         # roster query
                         if subscription == Subscription.NONE_PENDING_OUT:
                             itemArgs = {'ask' : 'subscribe'}
@@ -738,13 +740,13 @@ class C2SSubscriptionHandler(ThreadedHandler):
                         query = roster.createRosterQuery(cjid.getBare(),
                                         Subscription.getPrimaryNameFromState(subscription),
                                         cinfo.name, cinfo.groups, itemArgs)
-                    
+
                         # stamp presence with 'from'
                         treeCopy = deepcopy(tree)
                         treeCopy.set('from', jid)
-                        
+
                         toRoute = tostring(treeCopy)
-                        
+
                         # create unavailable presence stanzas for all resources of the user
                         resources = msg.conn.server.launcher.getC2SServer().data['resources']
                         jidForResources = resources.has_key(jid) and resources[jid]
@@ -755,20 +757,20 @@ class C2SSubscriptionHandler(ThreadedHandler):
                                 out += " to='%s' type='unavailable'/>" % cjid.getBare()
                             # and add to output
                             toRoute += out
-                        
+
                         # prepare the presence data for routing
                         d = {
                              'to' : cjid,
                              'data' : toRoute,
                              }
                         retVal = chainOutput(retVal, d)
-                        
+
                         # handlers in reverse order
                         msg.setNextHandler('route-server')
                         msg.setNextHandler('roster-push')
-                        
+
                         return chainOutput(retVal, query)
-        
+
         def cb(workReq, retVal):
             self.done = True
             # make sure we pass the lastRetVal along
@@ -776,18 +778,18 @@ class C2SSubscriptionHandler(ThreadedHandler):
                 self.retVal = lastRetVal
             else:
                 self.retVal = retVal
-        
+
         req = threadpool.makeRequests(act, None, cb)
-        
+
         def checkFunc():
             # need to poll manually or the callback's never called from the pool
             poll(tpool)
             return self.done
-        
+
         def initFunc():
             tpool.putRequest(req[0])
-        
+
         return FunctionCall(checkFunc), FunctionCall(initFunc)
-    
+
     def resume(self):
         return self.retVal

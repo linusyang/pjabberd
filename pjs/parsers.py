@@ -1,4 +1,4 @@
-""" XML Stream parsers """
+"""XML Stream parsers"""
 
 import pjs.elementtree.ElementTree as et
 import re
@@ -23,21 +23,21 @@ class IncrStreamParser:
     to call close() when done with the parser. If the stream isn't closed when
     close() is called, it will throw a xml.parsers.expat.ExpatError.
     """
-    
+
     c2sStanzaRe = re.compile(r'{jabber:client}(iq|message|presence)\b', re.U | re.I)
     s2sStanzaRe = re.compile(r'{jabber:server}(iq|message|presence)\b', re.U | re.I)
 
     def __init__(self, conn=None):
         self.conn = conn
         self._parser = None
-        
+
         self._exception = None # set this on quirky input
-        
+
         self.resetParser()
         self.resetStream()
-    
+
     def resetStream(self):
-        """Reset the stream"""
+        """Reset the stream, tree, etc. Everything but the parser."""
         self.depth = 0
         self.tree = None
         self.stream = None # this is the main <stream> et.Element
@@ -47,9 +47,9 @@ class IncrStreamParser:
         # ns of the stream: jabber:client / jabber:server
         self.ns = None
         self._exception = None
-                         
+
     def resetParser(self):
-        """Reset the parser"""
+        """Reset the parser and the tree."""
         # '}' is a ns-separator used in ET 1.3alpha. We want to duplicate its
         # behaviour here because its TreeBuilder doesn't prefix node names
         # with their namespace. Asking expat to do so will remove the xmlns
@@ -63,29 +63,31 @@ class IncrStreamParser:
         self._parser.StartNamespaceDeclHandler = self.handle_ns
         self._parser.buffer_text = 1 # single handle_text call per text node
         self._parser.returns_unicode = 1 # handler funcs get unicode from expat
-        
+
         # need to reset parts of the stream as well to ensure correct parsing
         self.depth = 0
         self.tree = None
         self._exception = None
-        
+
     def disable(self):
         """Turns off all handlers for this parser, so data will be parsed,
-        but not processed in any way.
+        but not processed in any way. This is useful for faking input into
+        the parser, so that its namespace expectations are primed for real
+        input. This is used for local S2S connections.
         """
         assert self._parser
-        
+
         self._parser.StartElementHandler = None
         self._parser.EndElementHandler = None
         self._parser.CharacterDataHandler = None
         self._parser.StartNamespaceDeclHandler = None
-        
+
     def enable(self):
         """Use after disable() to reenable the processing of the
         XML events.
         """
         assert self._parser
-        
+
         self._parser.StartElementHandler = self.handle_start
         self._parser.EndElementHandler = self.handle_end
         self._parser.CharacterDataHandler = self.handle_text
@@ -99,14 +101,14 @@ class IncrStreamParser:
 #        if data != ' ':
 #            logging.debug("[%s] For connection %s parser got: %s",
 #                          self.__class__, self.conn.id, data)
-        
+
         try:
             self._parser.Parse(data, 0)
         except Exception, e:
             logging.warning("[%s] Parser died with %s",
                             self.__class__, e)
             # TODO: complain about invalid XML and close connection
-            
+
         if self._exception:
             # the parser found quirky input
             cause = self._exception.cause
@@ -129,7 +131,7 @@ class IncrStreamParser:
                                             {'version' : '1.0'})
                     self.ns = 'jabber:client'
                     self.enable()
-                    
+
                     # pretend we got session, since we won't
                     self.conn.data['user']['in-session'] = True
             else:
@@ -138,7 +140,7 @@ class IncrStreamParser:
                               self.__class__, data)
                 self._exception = None
                 return
-            
+
             self._exception = None
             # retry parsing
             self.feed(data)
@@ -147,7 +149,7 @@ class IncrStreamParser:
         """CLose the stream of XML data"""
         self._parser.Parse("", 1) # end of data
         del self._parser # get rid of circular references
-        
+
         self.resetStream()
 
     def handle_start(self, tag, attrs):
@@ -157,15 +159,15 @@ class IncrStreamParser:
         # some logic to bootstrap a handling phase
         # include logic for starting streams
         # build an ElementTree for all stanzas
-        
+
         self.depth += 1
-        
+
         assert(self.depth >= 1)
-        
+
         if self.depth == 1 and tag.find('stream') == -1:
             self._exception = QuirksModeException(QUIRK_MISSING_NEW_STREAM)
             return
-        
+
         if self.depth == 1:
             # if starting a new stream, don't reset the old one, because
             # we don't want to deal with changed namespaces or attributes
@@ -176,10 +178,10 @@ class IncrStreamParser:
                 wrapperEl.append(self.stream)
                 Dispatcher().dispatch(wrapperEl, self.conn, 'in-stream-reinit')
                 return
-            
+
             # handle <stream>, record it for XPath wrapping
             self.stream = et.Element(self._fixname(tag), attrs)
-            
+
             # wrap here because the Dispatcher will do tree[0]
             wrapperEl = et.Element('wrapper')
             wrapperEl.append(self.stream)
@@ -204,10 +206,10 @@ class IncrStreamParser:
         if self._exception:
             return
         self.depth -= 1
-        
+
         assert(self.depth >= 0)
-        
-        if self.depth == 0:
+
+        if self.depth == 0: # stream closed
             wrapperEl = et.Element('wrapper')
             dummyEl = et.Element('tag')
             wrapperEl.append(dummyEl)
@@ -220,28 +222,15 @@ class IncrStreamParser:
             self.tree.end(self._fixname(tag))
             # TODO: handle errors
             self.tree = self.tree.close()
-            
+
             # pass the el to the dispatcher for processing having wrapped it
             # in the <stream> element first
             tree = deepcopy(self.stream)
             tree.append(self.tree)
-            
-            # FIXME: remove this
-            if tree[0].tag == '{jabber:server}presence' and\
-            tree[0].get('type') == 'subscribe' and\
-            tree[0].get('to') == 'dv@localhost' and\
-            tree[0].get('from') == 'tro@localhost':
-                logging.debug("Got the S2S presence")
-                    
+
             if IncrStreamParser.c2sStanzaRe.search(self.tree.tag):
                 C2SStanzaDispatcher().dispatch(tree, self.conn)
             elif IncrStreamParser.s2sStanzaRe.search(self.tree.tag):
-                # FIXME: remove this
-                if tree[0].tag == '{jabber:server}presence' and\
-                tree[0].get('type') == 'subscribe' and\
-                tree[0].get('to') == 'dv@localhost' and\
-                tree[0].get('from') == 'tro@localhost':
-                    logging.debug("About to run the dispatcher on the S2S presence")
                 S2SStanzaDispatcher().dispatch(tree, self.conn)
             else:
                 Dispatcher().dispatch(tree, self.conn)
@@ -255,26 +244,26 @@ class IncrStreamParser:
         and stanza elements, but not inside the stanzas.
         """
         # TODO: test on very large text node. Will expat's buffer overflow?
-        
+
         if self._exception:
             return
-        
+
         if self.depth <= 1 and not text.strip():
             return
-        
+
         if self.depth <= 1:
             # TODO: there can't be any text between stanzas/streams, so maybe close the stream?
             pass
         else:
             self.tree.data(text)
-            
+
     def handle_ns(self, prefix, uri):
         if not self.ns:
             if uri == 'jabber:client':
                 self.ns = 'jabber:client'
             elif uri == 'jabber:server':
                 self.ns = 'jabber:server'
-            
+
     def _fixname(self, key):
         """Formats the node name according to ElementTree's convention of
         {ns}tag.
@@ -290,6 +279,9 @@ class IncrStreamParser:
         return name
 
 class QuirksModeException(Exception):
+    """Indicates that the other side sent unexpected input but we
+    can handle it anyway.
+    """
     def __init__(self, cause=None):
         Exception.__init__(self)
         self.cause = cause

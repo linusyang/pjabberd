@@ -1,10 +1,13 @@
-""" List of phases and their descriptions """
+"""List of phases and their descriptions. These are modifiable at run-time.
+See handlers.py for the definition of the handlers.
+
+See the design doc for description on what phases are for and how they work.
+"""
 
 from pjs.conf.handlers import handlers as h
 from pjs.utils import PrioritizedDict
 
 # TODO: add functions to fetch phases from the config file
-# TODO: add ordering to phases, so that we can decide on conflicts
 
 # XMPP core phases (stream, init, db, sasl, tls, etc. no stanzas like iq/message/presence)
 _corePhases = {
@@ -84,8 +87,8 @@ _c2sStanzaPhases = {
                      'handlers' : [h['iq-auth-set'], h['write']]
                      },
     'iq-bind' : {
-                 'description' : 'client binding a resource', 
-                 'xpath' : "{jabber:client}iq[@type='set']/{urn:ietf:params:xml:ns:xmpp-bind}bind", 
+                 'description' : 'client binding a resource',
+                 'xpath' : "{jabber:client}iq[@type='set']/{urn:ietf:params:xml:ns:xmpp-bind}bind",
                  'handlers' : [h['iq-bind'], h['write']]
                  },
     'iq-session' : {

@@ -1,0 +1,14 @@
+Installation
+------------
+
+At the moment, the server does not support installation, because it is not meant to be run standalone yet. Once we have a concrete implementation in place, an installation procedure will be provided.
+
+Running
+-------
+
+Running the existing incomplete implementation is possible as long as the `PYTHONPATH` environment variable contains the top-level jabber directory that itself contains the `pjs` directory.
+
+    $ cd code/jabber
+    $ PYTHONPATH=. python pjs/pjsserver.py
+
+`pysqlite` is required to run the current version.

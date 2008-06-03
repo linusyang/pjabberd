@@ -1,3 +1,7 @@
+"""Defines the routers. They're implemented as handlers that require
+specific objects in lastRetVal to work correctly.
+"""
+
 import logging
 
 from pjs.handlers.base import Handler, chainOutput
@@ -24,16 +28,16 @@ class ClientRouteHandler(Handler):
             logging.warning("[%s] Passed in incorrect routing structure",
                             self.__class__)
             return
-        
+
         d = lastRetVal.pop()
         data = d.get('data')
         to = d.get('to')
         preprocessFunc = d.get('preprocessFunc')
-        
+
         if data is None:
             logging.warning("[%s] No data to send", self.__class__)
             return
-        
+
         conns = msg.conn.server.launcher.getC2SServer().conns
 
         try:
@@ -41,13 +45,13 @@ class ClientRouteHandler(Handler):
         except Exception, e:
             logging.warning("[%s] %s", self.__class__, e)
             return
-        
+
         try:
             jid = getJID(to)
         except Exception, e:
             logging.warning("[%s] %s" + e, self.__class__, e)
             return
-        
+
         if jid.resource:
             # locate the resource of this JID
             def f(i):
@@ -59,14 +63,14 @@ class ClientRouteHandler(Handler):
                 jidConn = conns[i]
                 if not jidConn[0]: return False
                 return jidConn[0].node == jid.node and jidConn[0].domain == jid.domain
-            
+
         activeJids = filter(f, conns)
         for con in activeJids:
             if callable(preprocessFunc):
                 conns[con][1].send(prepareDataForSending(preprocessFunc(data, conns[con][1])))
             else:
                 conns[con][1].send(prepareDataForSending(data))
-                
+
 class ServerRouteHandler(Handler):
     """Handles routing of data to a client on this server.
     This handlers requires lastRetVal[-1] to contain the routing data. See
@@ -77,26 +81,26 @@ class ServerRouteHandler(Handler):
             logging.warning("[%s] Passed in incorrect routing structure",
                             self.__class__)
             return
-        
+
         d = lastRetVal.pop()
         data = d.get('data')
         to = d.get('to')
         preprocessFunc = d.get('preprocessFunc')
-        
+
         if data is None:
             logging.warning("[%s] No data to send", self.__class__)
             return
-        
+
         s2sConns = msg.conn.server.launcher.getS2SServer().s2sConns
         if s2sConns is None:
             return False
-        
+
         try:
             to = getRoute(data, to)
         except Exception, e:
             logging.warning("[%s] " + e, self.__class__)
             return
-        
+
         try:
             jid = getJID(to)
         except Exception, e:
@@ -125,10 +129,10 @@ class ServerRouteHandler(Handler):
                 # TODO: Domain lookup here for S2S via another handler
                 pass
             newconn['queue'] = [prepareDataForSending(data)]
-            
+
             msg.setNextHandler('new-s2s-conn')
-                
-                
+
+
 def getRoute(data, to):
     """Figure out the route from the data"""
     if to: return to

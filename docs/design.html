@@ -78,6 +78,10 @@
 
 <p>Because we need to allow handlers to perform I/O-based operations, we need to have <code>ThreadedHandler</code>s (see above). Because the entire server is running in a single thread, and because we need to ensure that message processing is occuring in order for any client (see <a href="http://www.xmpp.org/rfcs/rfc3921.html">RFC 3921</a>), the <code>pjs.events</code> keeps a queue of running <code>Message</code>s per connection and skips those that are already running. When a threaded handler is done (that is, when the function is provided to the framework returns <code>True</code>) the handler's <code>resume()</code> function is called within the main thread. Basically, the execution of the handlers chain is brought back into the main process after each threaded handler's operation completes. This allows only <em>some</em> handlers in a chain to be run in a thread.</p>
 
+<h4>Implementation Note</h4>
+
+<p>Pjabberd contains a modified copy of Python's asyncore module. It adds the ability to check a function's return value on every read from a socket. This allows the <code>ThreadedHandler</code> behaviour. In addition, the modified copy contains a way to call a scheduled <code>Message</code> if it's been queued due to another <code>Message</code> already being processed for the <code>Connection</code>.</p>
+
 <h2>Data Persistence</h2>
 
 <p>The framework uses SQLite (through <a href="http://oss.itsystementwicklung.de/trac/pysqlite/">pysqlite</a>) to provide persistence for data. This is not required, however. The classes that perform DB operations are independent of specific handlers. Therefore, it is possible to simply switch the handlers to ones that use a different means for storage. In the future, it will be possible to change, through a configuration file or at run time, classes like <code>Roster</code> that perform DB operations.</p>
@@ -91,6 +95,38 @@
 <p>There is no API provided at the moment. Most handlers just access information through dictionaries in the <code>Connection</code>, <code>Server</code> and <code>Message</code> objects. This is simple and extensible, because new handlers can store any arbitrary data in in the dictionaries. The API was not part of a design because it was not clear what data the users of the framework would want to access and how they would like to access it. An API will probably be introduced in the next version.</p>
 
 <p>There are some basic classes like <code>Roster</code> and <code>JID</code> in <code>roster.py</code> and <code>jid.py</code>, respectively.</p>
+
+<h2>Installation</h2>
+
+<p>At the moment, the server does not support installation, because it is not meant to be run standalone yet. Once we have a concrete implementation in place, an installation procedure will be provided.</p>
+
+<h2>Running</h2>
+
+<p>Running the existing incomplete implementation is possible as long as the <code>PYTHONPATH</code> environment variable contains the top-level jabber directory that itself contains the <code>pjs</code> directory.</p>
+
+<pre><code>$ cd code/jabber
+$ PYTHONPATH=. python pjs/pjsserver.py
+</code></pre>
+
+<p><code>pysqlite</code> is required to run the current version.</p>
+
+<p>To run the tests:</p>
+
+<pre><code>$ cd code/jabber
+$ PYTHONPATH=. python pjs/test/alltests.py
+</code></pre>
+
+<h2>Extending</h2>
+
+<p>To create a new handler and have it run within the current server implementation:</p>
+
+<ol>
+<li>Create a new class (preferably in one of the modules in <code>pjs.handlers</code> that implements a <code>Handler</code> or a <code>ThreadedHandler</code> interface from <code>pjs.handlers.base</code>.</li>
+<li>Add it to the mapping of handlers in <code>pjs.conf.handlers</code>.</li>
+<li>Find an existing phase in <code>pjs.conf.phases</code> or add a new one. Attach a handler to it as done for other handlers. Make sure to add the handler to the right phase dictionary. There are core, c2s, and s2s phases available, depending on what you want to do. If you want to create an autoresponder bot, you will probably need to alter one of the c2s phases. If you want to modify the way authentication works, it's the core phases you need.</li>
+</ol>
+
+<p>Create handlers from existing examples in modules like <code>pjs.handlers.iq</code> and <code>pjs.handlers.auth</code>. These have some boilerplate code with comments.</p>
 
 <div style="display:none">:wrap=soft:maxLineLen=100:noTabs=false:</div>
 </body></html>

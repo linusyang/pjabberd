@@ -86,16 +86,6 @@ class TestParser(unittest.TestCase):
         
         self.oldhandlers = copy.deepcopy(handlers.handlers)
         
-        def saveData(tree, msg, lastRetVal):
-            TestParser.stream = copy.deepcopy(self.p.stream)
-            TestParser.tree = copy.deepcopy(tree)
-        
-        class StreamEndHandler(Handler):
-            def handle(self, tree, msg, lastRetVal=None):
-                saveData(tree, msg, lastRetVal)
-        
-        handlers.handlers['stream-end']['handler'] = StreamEndHandler
-        
     def tearDown(self):
         unittest.TestCase.tearDown(self)
         

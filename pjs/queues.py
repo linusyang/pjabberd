@@ -1,3 +1,11 @@
+"""Contains various message processing queue stuff. events.py is the
+primary intended user. This guarantees that for any connection only one
+Message is being processed at a time.
+
+The launcher should already be initialized and set in pjs.conf.conf in order
+to import this.
+"""
+
 import pjs.conf.conf
 import socket
 import logging
@@ -44,12 +52,12 @@ def _runMessages():
             del _processingQ[i]
             i -= 1
             l -= 1
-            
+
             msg.process()
         i += 1
-    
+
 activeServers = pjs.conf.conf.launcher.servers
-            
+
 def pickupResults():
     """Picks up any available results on the result queue and calls
     runMessages() to continue processing the queue.
@@ -75,6 +83,5 @@ def pickupResults():
             del _runningMessages[connId]
         except Empty:
             break
-        
+
     _runMessages()
-    

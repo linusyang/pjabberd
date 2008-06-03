@@ -1,3 +1,9 @@
+# This is from http://chrisarndt.de/en/software/python/threadpool/
+# It was included in ActiveState's Python recipes online, which are all
+# free for use: http://aspn.activestate.com/ASPN/Cookbook/Python/Recipe/435883
+
+# A couple of small things have been fixed here to work with our architecture
+
 """Easy to use object-oriented thread pool framework.
 
 A thread pool is a class that maintains a pool of worker threads to perform
@@ -86,9 +92,9 @@ class WorkerThread(threading.Thread):
                 retVal = e
                 nil, t, v, tbinfo = compact_traceback()
                 logging.debug("Exception in thread: %s: %s -- %s", t,v,tbinfo)
-            
+
             self.resultQueue.put((request, retVal))
-            
+
             # Wake up asyncore
             # see connection.LocalTriggerConnection.__doc__
             if self.notifyFunc:
@@ -206,7 +212,7 @@ class ThreadPool:
                 self.poll(True)
             except NoResultsPending:
                 break
-            
+
     def __repr__(self):
         return '<ThreadPool object at %s>' % id(self)
     __str__ = __repr__

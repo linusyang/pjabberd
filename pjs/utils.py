@@ -1,3 +1,5 @@
+"""Useful functions that can (and should) be used by handlers"""
+
 from threading import RLock
 from random import random
 
@@ -6,7 +8,7 @@ try:
     from hashlib import sha1
 except ImportError:
     from sha import new as sha1
-    
+
 import time, os, re, sys
 
 standardNSre = re.compile(r'^{jabber:(client|server)}', re.UNICODE)
@@ -18,25 +20,28 @@ class FunctionCall:
     function call. Its main feature is that it is hashable, so it can be used
     as a key in a dictionary. The properties shouldn't be altered, but if
     they are, the hash doesn't change.
+
+    This should be used by ThreadedHandlers to return initiating and checking
+    functions from their handle() methods.
     """
     def __init__(self, func, funcArgs={}):
         assert(callable(func))
         assert(type(funcArgs) == type({}))
-        
+
         self.func = func
         self.funcArgs = funcArgs
-        
+
         # build the value to hash on by concatinating string representations
         # of the parameters.
         self.hash = func.__str__()
         for k, v in funcArgs.items():
             self.hash += k.__repr__() + v.__repr__()
-            
+
         self.hash = hash(self.hash)
-        
+
     def __hash__(self):
         return self.hash
-    
+
 
 def generateId():
     """Generates a unique id for anything"""
@@ -66,9 +71,9 @@ def tostring(tree):
             res += '</%s>' % tag
         else:
             res += '/>'
-            
+
         return res
-        
+
     res = u''
     res += processTree(tree)
     return res
@@ -113,7 +118,7 @@ class PrioritizedDict(dict):
     """A dictionary that has order during iteration based on a 'priority'
     key of every key/value pair. The higher the priority value the earlier
     the pair will come in an iteration.
-    
+
     Example: d = {'a' : {'name' : 'A'}, 'b' : {'name' : 'B', 'priority' : 1}}
     When iterated over, the 'b' pair with priority 1 will come first, since the
     default priority is 0.
@@ -140,7 +145,7 @@ class PrioritizedDict(dict):
         dict.__delitem__(self, key)
         self.reprioritize()
     iterkeys = __iter__
-        
+
 #dd = {
 #      'a' : { 'name' : 'a', 'priority' : 1},
 #      'b' : { 'name' : 'b', 'priority' : 2},
@@ -154,6 +159,7 @@ class PrioritizedDict(dict):
 #for i in d:
 #    print d[i]
 
+# this is not used anywhere right now
 class SynchronizedDict(dict):
     """A dictionary that only allows one thread to access or modify it
     at a time.
@@ -168,35 +174,35 @@ class SynchronizedDict(dict):
                 dict.__init__(self)
         finally:
             self.lock.release()
-            
+
     def __getitem__(self, key):
         self.lock.acquire()
         try:
             return dict.__getitem__(self, key)
         finally:
             self.lock.release()
-            
+
     def __setitem__(self, key, value):
         self.lock.acquire()
         try:
             dict.__setitem__(self, key, value)
         finally:
             self.lock.release()
-            
+
     def __delitem__(self, key):
         self.lock.acquire()
         try:
             dict.__delitem__(self, key)
         finally:
             self.lock.release()
-    
+
     def __len__(self):
         self.lock.acquire()
         try:
             return dict.__len__(self)
         finally:
             self.lock.release()
-            
+
     def __iter__(self):
         self.lock.acquire()
         try:
@@ -204,7 +210,7 @@ class SynchronizedDict(dict):
                 yield k
         finally:
             self.lock.release()
-            
+
     def __contains__(self, item):
         self.lock.acquire()
         try:

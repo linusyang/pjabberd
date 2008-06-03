@@ -1,3 +1,5 @@
+"""<iq>-related handlers"""
+
 import logging
 import pjs.threadpool as threadpool
 
@@ -14,18 +16,18 @@ def bindResource(msg, resource):
     data = msg.conn.data
     server = msg.conn.server
     jid = data['user']['jid']
-    
+
     # check if we have this resource already
     if server.data['resources'].has_key(jid) and \
     server.data['resources'][jid].has_key(resource):
         # create our own
         resource = resource + generateId()[:6]
     data['user']['resource'] = resource
-    
+
     # record the resource in the JID object of the (JID, Connection) pair
     # this is for local delivery lookups
     server.conns[msg.conn.id][0].resource = resource
-    
+
     # save the jid/resource in the server's global storage
     if not server.data['resources'].has_key(jid):
         server.data['resources'][jid] = {}
@@ -43,24 +45,24 @@ class IQBindHandler(Handler):
             else:
                 # generate an id
                 resource = generateId()[:6]
-            
+
             # TODO: check that we don't already have such a resource
             jid = msg.conn.data['user']['jid']
             bindResource(msg, resource)
-                
+
             res = Element('iq', {'type' : 'result', 'id' : id})
             bind = Element('bind', {'xmlns' : 'urn:ietf:params:xml:ns:xmpp-bind'})
             jidEl = Element('jid')
             jidEl.text = '%s/%s' % (jid, resource)
             bind.append(jidEl)
             res.append(bind)
-            
+
             return chainOutput(lastRetVal, res)
         else:
             logging.warning("[%s] No id in <iq>:\n%s", self.__class__, tostring(iq))
-            
+
         return lastRetVal
-        
+
 class IQSessionHandler(Handler):
     """Handles session establishment"""
     def handle(self, tree, msg, lastRetVal=None):
@@ -69,11 +71,11 @@ class IQSessionHandler(Handler):
                              'type' : 'result',
                              'id' : tree.get('id')
                              })
-        
+
         msg.conn.data['user']['in-session'] = True
-        
+
         return chainOutput(lastRetVal, res)
-    
+
 class IQRosterGetHandler(ThreadedHandler):
     """Responds to a roster iq get request"""
     def __init__(self):
@@ -81,14 +83,14 @@ class IQRosterGetHandler(ThreadedHandler):
         self.done = False
         # used to pass the output to the next handler
         self.retVal = None
-    
+
     def handle(self, tree, msg, lastRetVal=None):
         self.done = False
-        
+
         tpool = msg.conn.server.threadpool
-        
+
         msg.conn.data['user']['requestedRoster'] = True
-        
+
         # the actual function executing in the thread
         def act():
             # TODO: verify that it's coming from a known user
@@ -100,20 +102,20 @@ class IQRosterGetHandler(ThreadedHandler):
                                 self.__class__, tree)
                 # TODO: throw exception here
                 return
-            
+
             roster = Roster(jid)
-            
+
             roster.loadRoster()
-            
+
             res = Element('iq', {
                                  'to' : '/'.join([jid, resource]),
                                  'type' : 'result',
                                  'id' : id
                                  })
-            
+
             res.append(roster.getAsTree())
             return chainOutput(lastRetVal, res)
-        
+
         def cb(workReq, retVal):
             self.done = True
             # make sure we pass the lastRetVal along
@@ -121,24 +123,24 @@ class IQRosterGetHandler(ThreadedHandler):
                 self.retVal = lastRetVal
             else:
                 self.retVal = retVal
-                
+
         req = threadpool.makeRequests(act, None, cb)
-        
+
         def checkFunc():
             # need to poll manually or the callback's never called from the pool
             poll(tpool)
             return self.done
-        
+
         def initFunc():
             tpool.putRequest(req[0])
-            
+
         return FunctionCall(checkFunc), FunctionCall(initFunc)
-            
-    
+
+
     def resume(self):
         # this is passed to the next handler
         return self.retVal
-    
+
 class IQRosterUpdateHandler(ThreadedHandler):
     """Responds to a roster iq set request"""
     def __init__(self):
@@ -146,12 +148,12 @@ class IQRosterUpdateHandler(ThreadedHandler):
         self.done = False
         # used to pass the output to the next handler
         self.retVal = None
-        
+
     def handle(self, tree, msg, lastRetVal=None):
         self.done = False
-        
+
         tpool = msg.conn.server.threadpool
-        
+
         # the actual function executing in the thread
         def act():
             # TODO: verify that it's coming from a known user
@@ -162,7 +164,7 @@ class IQRosterUpdateHandler(ThreadedHandler):
                                 self.__class__, tree)
                 # TODO: throw exception here
                 return
-            
+
             # RFC 3921 says in section 7.4 "an item", so we only handle the
             # first <item>
             item = tree[0][0] # iq -> query -> item
@@ -176,7 +178,7 @@ class IQRosterUpdateHandler(ThreadedHandler):
                 return
 
             roster = Roster(jid)
-            
+
             xpath = './{jabber:iq:roster}query/{jabber:iq:roster}item[@subscription="remove"]'
             if tree.find(xpath) is not None:
                 # we're removing the roster item. See 3921 8.6
@@ -191,17 +193,17 @@ class IQRosterUpdateHandler(ThreadedHandler):
                     for i in jidForResources:
                         out += "<presence from='%s/%s'" % (jid, i)
                         out += " to='%s' type='unavailable'/>" % cjid
-                    
+
                 # prepare routing data
                 d = {
                      'to' : cjid,
                      'data' : out
                      }
-                
+
                 query = deepcopy(tree[0])
-                
+
                 retVal = chainOutput(lastRetVal, query)
-                
+
                 if roster.removeContact(cjid) is False:
                     # We don't even have this contact in the roster anymore.
                     # The contact is probably local (like ourselves).
@@ -218,29 +220,29 @@ class IQRosterUpdateHandler(ThreadedHandler):
                     # problem should go away, as it will allow the roster-push
                     # to arrive after presences every time.
                     pass
-                    
+
                 # route the presence first, then do a roster push
                 msg.setNextHandler('roster-push')
                 msg.setNextHandler('route-server')
-                
+
                 return chainOutput(retVal, d)
-            
+
             # we're updating/adding the roster item
-            
+
             groups = [i.text for i in list(item.findall('{jabber:iq:roster}group'))]
-            
+
             cid = roster.updateContact(cjid, groups, name)
-            
+
             # get the subscription status before roster push
             sub = roster.getSubPrimaryName(cid)
-                
+
             # prepare the result for roster push
             query = Roster.createRosterQuery(cjid, sub, name, groups)
-                
+
             msg.setNextHandler('roster-push')
-                
+
             return chainOutput(lastRetVal, query)
-        
+
         def cb(workReq, retVal):
             self.done = True
             # make sure we pass the lastRetVal along
@@ -248,23 +250,23 @@ class IQRosterUpdateHandler(ThreadedHandler):
                 self.retVal = lastRetVal
             else:
                 self.retVal = retVal
-                
+
         req = threadpool.makeRequests(act, None, cb)
-        
+
         def checkFunc():
             # need to poll manually or the callback's never called from the pool
             poll(tpool)
             return self.done
-        
+
         def initFunc():
             tpool.putRequest(req[0])
-            
+
         return FunctionCall(checkFunc), FunctionCall(initFunc)
-        
+
     def resume(self):
         # this is passed to the next handler
         return self.retVal
-    
+
 class RosterPushHandler(ThreadedHandler):
     """Uses the last return value from the previous handler to push a roster
     change to all connected resources of the user. This handler needs to be
@@ -282,12 +284,12 @@ class RosterPushHandler(ThreadedHandler):
         self.done = False
         # used to pass the output to the next handler
         self.retVal = None
-        
+
     def handle(self, tree, msg, lastRetVal=None):
         self.done = False
-        
+
         tpool = msg.conn.server.threadpool
-        
+
         def act():
             # we have to be passed a tree to work
             # or a tuple with routingData and a tree
@@ -311,17 +313,17 @@ class RosterPushHandler(ThreadedHandler):
                                 'as the last item in lastRetVal or a tuple ' + \
                                 'with (routeData, query Element)', self.__class__)
                 return
-            
+
             # this is the roster <query> that we'll send
             # it could be a tuple if we got routing data as well
             query = lastRetVal.pop(-1)
             routeData = None
-            
+
             # did we get routing data (from S2S)
             if isinstance(query, tuple):
                 routeData = query[0]
                 query = query[1]
-            
+
             if routeData:
                 jid = routeData['jid']
                 resources = routeData['resources']
@@ -329,7 +331,7 @@ class RosterPushHandler(ThreadedHandler):
                 jid = msg.conn.data['user']['jid']
                 resource = msg.conn.data['user']['resource']
                 resources = msg.conn.server.data['resources'][jid]
-                
+
             for res, con in resources.items():
                 # don't send the roster to clients that didn't request it
                 if con.data['user']['requestedRoster']:
@@ -339,7 +341,7 @@ class RosterPushHandler(ThreadedHandler):
                                         'id' : generateId()[:10]
                                         })
                     iq.append(query)
-                    
+
                     # TODO: remove this. debug.
                     logging.debug("Sending " + tostring(iq))
                     con.send(tostring(iq))
@@ -354,7 +356,7 @@ class RosterPushHandler(ThreadedHandler):
                      }
                 iq = Element('iq', d)
                 return chainOutput(lastRetVal, iq)
-        
+
         def cb(workReq, retVal):
             self.done = True
             # make sure we pass the lastRetVal along
@@ -362,19 +364,19 @@ class RosterPushHandler(ThreadedHandler):
                 self.retVal = lastRetVal
             else:
                 self.retVal = retVal
-                
+
         req = threadpool.makeRequests(act, None, cb)
-        
+
         def checkFunc():
             # need to poll manually or the callback's never called from the pool
             poll(tpool)
             return self.done
-        
+
         def initFunc():
             tpool.putRequest(req[0])
-            
+
         return FunctionCall(checkFunc), FunctionCall(initFunc)
-        
+
     def resume(self):
         # this is passed to the next handler
         return self.retVal
@@ -389,7 +391,7 @@ class IQNotImplementedHandler(Handler):
             logging.warning("[%s] Original <iq> missing:\n%s",
                             self.__class__, tostring(tree))
             return
-        
+
         id = origIQ.get('id')
         if id:
             res = Element('iq', {
@@ -397,16 +399,16 @@ class IQNotImplementedHandler(Handler):
                                  'id' : id
                                 })
             res.append(origIQ)
-            
+
             err = Element('error', {'type' : 'cancel'})
             SubElement(err, 'service-unavailable',
                        {'xmlns' : 'urn:ietf:params:xml:ns:xmpp-stanzas'})
-            
+
             res.append(err)
-            
+
             return chainOutput(lastRetVal, res)
         else:
             logging.warning("[%s] No id in <iq>:\n%s",
                             self.__class__, tostring(origIQ))
-        
+
         return lastRetVal

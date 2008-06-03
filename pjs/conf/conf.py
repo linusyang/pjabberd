@@ -1,6 +1,6 @@
 # configuration parsing and other stuff should go here
 
-# this is modified by the Launcher when it is started
-# it's here because asyncore has no access to it otherwise
-# (no connection to traverse)
+# this needs to be set by the server when it is started
+# launcher.run() needs to be executed in order to actually
+# bind to sockets.
 launcher = None

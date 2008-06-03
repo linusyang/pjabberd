@@ -1,3 +1,7 @@
+"""Contains the basic interfaces for handlers, documentation and
+helper functions.
+"""
+
 import pjs.threadpool
 
 class Handler:
@@ -5,10 +9,10 @@ class Handler:
     def __init__(self):
         """Will be called at server start"""
         pass
-    
+
     def handle(self, tree, msg, lastRetVal=None):
         """Handle a message.
-        
+
         tree -- ET's Element. Usually the stanza within the <stream> element
         msg -- reference to the Message object that's running this Handler
         lastRetVal -- the return value of the last executed Handler within the
@@ -16,7 +20,7 @@ class Handler:
                       object or None.
         """
         raise NotImplementedError, 'needs to be overridden in a subclass'
-    
+
 class ThreadedHandler:
     """Generic threaded handler. This handler should start a thread or ask a
     threadpool to execute a function, then return promptly. The function being
@@ -26,16 +30,16 @@ class ThreadedHandler:
     def __init__(self):
         """Will be called at server start"""
         pass
-    
+
     def handle(self, tree, msg, lastRetVal=None):
         """Handle a message.
-        
+
         tree -- ET's Element. Usually the stanza within the <stream> element
         msg -- reference to the Message object that's running this Handler
         lastRetVal -- the return value of the last executed Handler within the
                       chain being run by msg. This could be an Exception
                       object or None.
-                      
+
         This method MUST NOT block and MUST return a tuple of two
         pjs.utils.FunctionCall objects. The first of the two FunctionCall
         objects is for the checking function and the second is for the
@@ -50,12 +54,14 @@ class ThreadedHandler:
         raise NotImplementedError, 'needs to be overridden in a subclass'
 
 def poll(threadpool):
-    """Polls the threadpool"""
+    """Polls the threadpool. ThreadedHandler's checking functions should do
+    this to make the threadpool pick up results.
+    """
     try:
         threadpool.poll()
     except pjs.threadpool.NoResultsPending:
         pass
-    
+
 def chainOutput(lastRetVal, out):
     """Attaches out to lastRetVal and returns the result. This is used for
     chaining return values in handlers. If lastRetVal is not a list, a new list

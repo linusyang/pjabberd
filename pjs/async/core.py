@@ -62,12 +62,12 @@ try:
     socket_map
 except NameError:
     socket_map = {}
-    
+
 try:
     func_map # dictionary of FunctionCall => callback
 except NameError:
     func_map = {}
-    
+
 class ExitNow(Exception):
     pass
 
@@ -111,7 +111,7 @@ def readwrite(obj, flags):
 def poll(timeout=0.0, map=None):
     # pick up results from Messages and process queued
     pjs.queues.pickupResults()
-    
+
     if map is None:
         map = socket_map
     if map:
@@ -135,7 +135,7 @@ def poll(timeout=0.0, map=None):
                     raise
                 else:
                     return
-                
+
         for fd in r:
             obj = map.get(fd)
             if obj is None:
@@ -153,7 +153,7 @@ def poll(timeout=0.0, map=None):
             if obj is None:
                 continue
             _exception(obj)
-        
+
     if func_map:
         funcCheck()
 
@@ -183,19 +183,19 @@ def poll2(timeout=0.0, map=None):
             if err[0] != EINTR:
                 raise
             r = []
-            
+
         # pick up results from Messages and process queued
         pjs.queues.pickupResults()
-        
+
         for fd, flags in r:
             obj = map.get(fd)
             if obj is None:
                 continue
             readwrite(obj, flags)
-            
+
     if func_map:
         funcCheck()
-        
+
 poll3 = poll2                           # Alias for backward compatibility
 
 def funcCheck():
@@ -205,16 +205,16 @@ def funcCheck():
     for f in func_map.keys():
         ret = False
         cb = func_map[f]
-        
+
         try:
             ret = f.func(**f.funcArgs)
         except Exception, e:
             cb(e)
-        
+
         if ret:
             cb()
             del func_map[f]
-            
+
 def loop(timeout=30.0, use_poll=False, map=None, count=None):
     if map is None:
         map = socket_map
@@ -242,7 +242,7 @@ def wf(self, checkFunc, cb, initFunc=None):
     When checkFunc.func returns True, cb is called. checkFunc and
     initFunc are pjs.utils.FunctionCall objects, so that they are
     hashable in func_map.
-    
+
     If an exception is raised when calling initFunc.func or checkFunc.func,
     cb will be passed the exception as a parameter, so it should be of the
     form: def cb(exception=None)
@@ -256,7 +256,7 @@ def wf(self, checkFunc, cb, initFunc=None):
         except Exception, e:
             cb(e)
             return
-    
+
     func_map[checkFunc] = cb
 
 class dispatcher:
@@ -266,7 +266,7 @@ class dispatcher:
     accepting = False
     closing = False
     addr = None
-    
+
     watch_function = wf
 
     def __init__(self, sock=None, map=None):
@@ -341,7 +341,7 @@ class dispatcher:
                 )
         except socket.error:
             pass
-        
+
     # ==================================================
     # predicates for select()
     # these are used as filters for the lists of sockets
@@ -510,7 +510,7 @@ class dispatcher:
 # ---------------------------------------------------------------------------
 
 class dispatcher_with_send(dispatcher):
-    
+
     watch_function = wf
 
     def __init__(self, sock=None, map=None):
@@ -533,7 +533,7 @@ class dispatcher_with_send(dispatcher):
             self.log_info('sending %s' % repr(data))
         self.out_buffer = self.out_buffer + data
         self.initiate_send()
-        
+
 # ---------------------------------------------------------------------------
 # used for debugging.
 # ---------------------------------------------------------------------------

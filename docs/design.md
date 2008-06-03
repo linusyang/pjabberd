@@ -98,6 +98,37 @@ There is no API provided at the moment. Most handlers just access information th
 
 There are some basic classes like `Roster` and `JID` in `roster.py` and `jid.py`, respectively.
 
+Installation
+------------
+
+At the moment, the server does not support installation, because it is not meant to be run standalone yet. Once we have a concrete implementation in place, an installation procedure will be provided.
+
+Running
+-------
+
+Running the existing incomplete implementation is possible as long as the `PYTHONPATH` environment variable contains the top-level jabber directory that itself contains the `pjs` directory.
+
+	$ cd code/jabber
+	$ PYTHONPATH=. python pjs/pjsserver.py
+
+`pysqlite` is required to run the current version.
+
+To run the tests:
+
+	$ cd code/jabber
+	$ PYTHONPATH=. python pjs/test/alltests.py
+
+Extending
+---------
+
+To create a new handler and have it run within the current server implementation:
+
+1. Create a new class (preferably in one of the modules in `pjs.handlers` that implements a `Handler` or a `ThreadedHandler` interface from `pjs.handlers.base`.
+2. Add it to the mapping of handlers in `pjs.conf.handlers`.
+3. Find an existing phase in `pjs.conf.phases` or add a new one. Attach a handler to it as done for other handlers. Make sure to add the handler to the right phase dictionary. There are core, c2s, and s2s phases available, depending on what you want to do. If you want to create an autoresponder bot, you will probably need to alter one of the c2s phases. If you want to modify the way authentication works, it's the core phases you need.
+
+Create handlers from existing examples in modules like `pjs.handlers.iq` and `pjs.handlers.auth`. These have some boilerplate code with comments.
+
 
   [3921]: http://www.xmpp.org/rfcs/rfc3921.html
 
