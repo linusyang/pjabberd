@@ -10,7 +10,7 @@ phases = {
                        },
           'stream-init' : {
                            'description' : 'initializes stream data',
-                           'handlers' : []
+                           'handlers' : [h['stream-init'], h['write']]
                            },
           'features' : {
                         'description' : 'stream features such as TLS and resource binding',

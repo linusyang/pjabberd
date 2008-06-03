@@ -8,6 +8,7 @@ class Server(dispatcher):
         dispatcher.__init__(self)
         self.conns = []
         self.ip = ip
+        self.hostname = ip
         self.port = port
         self.create_socket(socket.AF_INET, socket.SOCK_STREAM)
         self.set_reuse_addr()

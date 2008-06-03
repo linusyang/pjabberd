@@ -10,6 +10,9 @@ class Connection(asyncore.dispatcher_with_send):
         
         self.parser = parsers.borrow_parser(self)
         
+        # any sort of per-connection data. can be accessed by handlers
+        self.data = {}
+        
     def handle_expt(self):
         # log it
         pass

@@ -26,6 +26,7 @@ class IncrStreamParser:
         self._parser.StartElementHandler = self.handle_start
         self._parser.EndElementHandler = self.handle_end
         self._parser.CharacterDataHandler = self.handle_text
+        self._parser.StartNamespaceDeclHandler = self.handle_ns
         self._parser.buffer_text = 1 # single handle_text call per text node
         self._parser.returns_unicode = 1 # handler funcs get unicode from expat
         
@@ -33,6 +34,9 @@ class IncrStreamParser:
         
         # this is the main <stream> et.Element
         self.stream = None
+        
+        # ns of the stream: jabber:client / jabber:server
+        self.ns = None
         
         self.reset()
     
@@ -76,7 +80,7 @@ class IncrStreamParser:
             
             # handle <stream>, record it for XPath wrapping
             self.stream = et.Element(self._fixname(tag), attrs)
-            #Dispatcher().dispatch(self.stream, self.conn, 'stream-init')
+            Dispatcher().dispatch(self.stream, self.conn, 'stream-init')
         elif self.depth == 2:
             # handle stanzas, build tree
             self.tree = et.TreeBuilder()
@@ -124,6 +128,13 @@ class IncrStreamParser:
             pass
         else:
             self.tree.data(text)
+            
+    def handle_ns(self, prefix, uri):
+        if not self.ns:
+            if uri == 'jabber:client':
+                self.ns = 'jabber:client'
+            elif uri == 'jabber:server':
+                self.ns = 'jabber:server'
             
     def _fixname(self, key):
         """Formats the node name according to ElementTree's convention of
