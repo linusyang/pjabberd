@@ -8,6 +8,6 @@ class WriteHandler(Handler):
         all out. This only works with unicode strings for now.
         """
         out = msg.outputBuffer
-        if lastRetVal:
+        if lastRetVal and not isinstance(lastRetVal, Exception):
             out += unicode(lastRetVal)
         msg.conn.send(out)
