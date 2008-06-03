@@ -73,7 +73,7 @@ class S2SServer(Server):
         self.s2sConns = {}
         
     def createOutConnection(self, sock):
-        conn = ServerOutConnection(sock, sock.getsockname(), self)
+        conn = ServerOutConnection(sock, sock.getpeername(), self)
         self.conns[conn.id] = ('localhost-out', conn)
         return conn
         

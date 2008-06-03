@@ -11,6 +11,7 @@ from copy import deepcopy
 def borrow_parser(conn):
     """Borrow a parser from a pool of parsers"""
     # TODO: implement the pool. For now just return a new parser
+    logging.debug("Creating a new parser for %s", conn.id)
     return IncrStreamParser(conn)
 
 class IncrStreamParser:
@@ -78,12 +79,16 @@ class IncrStreamParser:
         
         # FIXME: delete the next two lines
         if data == "<presence to='dv@localhost' type='subscribe' from='tro@localhost'/>":
-            logging.info("Parser about to eat S2S presence")
+            logging.info("Parser about to eat S2S presence with parser %s and conn %s",
+                         self, self.conn.id)
             
 #        if self.conn.id.find('sin') != -1 or self.conn.id.find('sout') != -1:
 #            self.seenSoFar += data
 #            logging.debug("Parser for connection %s seen so far: %s", self.conn.id, self.seenSoFar)
-        self._parser.Parse(data, 0)
+        try:
+            self._parser.Parse(data, 0)
+        except Exception, e:
+            logging.warning("parser died with %s", e)
         a = 1+1
 
     def close(self):
