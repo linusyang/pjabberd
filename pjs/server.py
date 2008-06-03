@@ -49,7 +49,7 @@ class Server(dispatcher):
         
     def handle_close(self):
         for c in self.conns:
-            c[1].handle_close()
+            self.conns[c][1].handle_close()
         self.close()
 
 class C2SServer(Server):
