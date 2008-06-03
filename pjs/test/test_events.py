@@ -136,7 +136,7 @@ class SimpleThreadedHandler(pjs.handlers.base.ThreadedHandler):
             return 'success'
         def cb(workReq, retVal):
             self.passed = retVal
-        req = pjs.threadpool.makeRequests(sleep, [({'arg' : 0}, None)], cb)
+        req = pjs.threadpool.makeRequests(sleep, [([0], None)], cb)
         
         def checkFunc():
             return self.passed
