@@ -53,14 +53,14 @@ def tostring(tree):
         res = u'<' + res
         for k,v in tree.items():
             res += " %s='%s'" % (k,v)
-        if len(tree) > 0 or tree.text or tree.tail:
+        if len(tree) > 0 or tree.text:
             res += '>'
             if tree.text:
                 res += tree.text
             for i in tree:
                 res += processTree(i)
-            if tree.tail:
-                res += tree.tail
+                if i.tail:
+                    res += i.tail
             res += '</%s>' % tag
         else:
             res += '/>'
