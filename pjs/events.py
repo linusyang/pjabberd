@@ -224,6 +224,7 @@ def pickupResults():
                 # there, so we log it and move on
                 logging.warning("[events] Connection id %d has no corresponding" +\
                                 " Connection object. Dropping result from queue.", connId)
+            resultQ.task_done()
             del _runningMessages[connId]
         except Empty:
             break

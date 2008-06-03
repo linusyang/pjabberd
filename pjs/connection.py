@@ -58,6 +58,8 @@ class ClientConnection(Connection):
     def __init__(self, sock, addr, server):
         Connection.__init__(self, sock, addr, server)
         
+        self.id = 'c%s' % id(self)
+        
         if server.data['info']['type'] != 'c2s':
             raise Exception, "Trying to create a c2s connection with a non-c2s server"
         
@@ -76,7 +78,11 @@ class ClientConnection(Connection):
         # this resource is no longer connected
         jid = self.data['user']['jid']
         resource = self.data['user']['resource']
-        del self.server.data['resources'][jid][resource]
+        
+        logging.debug("Closing ClientConnection with %s", jid)
+        
+        if jid:
+            del self.server.data['resources'][jid][resource]
         
         Connection.handle_close(self)
 
@@ -99,10 +105,15 @@ class ServerInConnection(ServerConnection):
     def __init__(self, sock, addr, server):
         ServerConnection.__init__(self, sock, addr, server)
         
+        self.id = 'sin%s' % id(self)
+        
         self.data['server']['direction'] = 'from'
         
     def handle_close(self):
         hostname = self.data['server']['hostname']
+        
+        logging.debug("Closing ServerInConnection with %s", hostname)
+        
         if hostname:
             self.server.s2sConns[hostname][0] = None
         
@@ -113,6 +124,8 @@ class ServerOutConnection(ServerConnection):
     def __init__(self, sock, addr, server):
         ServerConnection.__init__(self, sock, addr, server)
         
+        self.id = 'sout%s' % id(self)
+        
         self.data['server']['direction'] = 'to'
         
         # queue of messages to send to the remote server as soon as we are
@@ -121,6 +134,9 @@ class ServerOutConnection(ServerConnection):
         
     def handle_close(self):
         hostname = self.data['server']['hostname']
+        
+        logging.debug("Closing ServerOutConnection with %s", hostname)
+        
         if hostname:
             self.server.s2sConns[hostname][1] = None
         

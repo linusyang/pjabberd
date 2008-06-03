@@ -67,7 +67,9 @@ class S2SServer(Server):
         self.s2sConns = {}
         
     def createOutConnection(self, sock):
-        return ServerOutConnection(sock, sock.getsockname(), self)
+        conn = ServerOutConnection(sock, sock.getsockname(), self)
+        self.conns[conn.id] = ('localhost-out', conn)
+        return conn
         
     def handle_accept(self):
         sock, addr = self.accept()
@@ -75,4 +77,4 @@ class S2SServer(Server):
         # TODO: don't assume localhost here
         self.s2sConns.setdefault('localhost', [None, None])[0] = conn
         # we don't know the hostname until stream starts
-        self.conns[conn.id] = (None, conn)
+        self.conns[conn.id] = ('localhost-in', conn)
