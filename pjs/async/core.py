@@ -161,7 +161,7 @@ class _dispatcher_with_sendWithFunctions(asyncore.dispatcher_with_send):
         cb will be passed the exception as a parameter, so it should be of the
         form: def cb(exception=None)
         """
-        assert(hasattr(checkFunc, 'func') and callable(cb))
+        assert(isinstance(checkFunc, pjs.utils.FunctionCall) and callable(cb))
 
         if (initFunc):
             assert(hasattr(initFunc, 'func'))
