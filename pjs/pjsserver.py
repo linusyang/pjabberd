@@ -21,12 +21,23 @@ class PJSLauncher:
         
     def run(self):
         from pjs.server import C2SServer, S2SServer
-        self.servers.append(C2SServer(self.hostname, self.c2sport, self))
+        c2s = C2SServer(self.hostname, self.c2sport, self)
+        self.servers.append(c2s)
         
         s2s = S2SServer(self.hostname, self.s2sport, self)
         self.router.setConnMap(s2s.s2sConns)
-        
         self.servers.append(s2s)
+        
+        from pjs.connection import LocalTriggerConnection
+        
+        # see connection.LocalTriggerConnection.__doc__
+        self.triggerConn = LocalTriggerConnection(self.hostname, self.c2sport)
+        
+        def notifyFunc():
+            self.triggerConn.send(' ')
+            
+        c2s.createThreadpool(5, notifyFunc)
+        s2s.createThreadpool(5, notifyFunc)
 
 if __name__ == '__main__':
     launcher = PJSLauncher()

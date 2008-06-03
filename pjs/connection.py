@@ -106,7 +106,7 @@ class ServerInConnection(ServerConnection):
         if hostname:
             self.server.s2sConns[hostname][0] = None
         
-        Connection.handle_close(self)
+        ServerConnection.handle_close(self)
         
 class ServerOutConnection(ServerConnection):
     """An s2s connection from us to a remote server"""
@@ -124,7 +124,7 @@ class ServerOutConnection(ServerConnection):
         if hostname:
             self.server.s2sConns[hostname][1] = None
         
-        Connection.handle_close(self)
+        ServerConnection.handle_close(self)
 
 class LocalTriggerConnection(asyncore.dispatcher_with_send):
     """This creates a local connection back to our server.

@@ -2,12 +2,15 @@ import logging
 import pjs.threadpool as threadpool
 
 from pjs.handlers.base import ThreadedHandler, Handler, chainOutput, poll
+from pjs.handlers.write import prepareDataForSending
 from pjs.elementtree.ElementTree import Element, SubElement
 from pjs.utils import FunctionCall
 from pjs.roster import Roster, Subscription
+from pjs.jid import JID
+from copy import deepcopy
 
-class PresenceHandler(ThreadedHandler):
-    """Handles plain <presence> (without type)"""
+class C2SPresenceHandler(ThreadedHandler):
+    """Handles plain <presence> (without type) sent by the clients"""
     def __init__(self):
         # this is true when the threaded handler returns
         self.done = False
@@ -20,18 +23,67 @@ class PresenceHandler(ThreadedHandler):
         tpool = msg.conn.server.threadpool
         
         def act():
-            pass
+            jid = msg.conn.data['user']['jid']
+            resource = msg.conn.data['user']['resource']
+            
+            presTree = deepcopy(tree[0])
+            presTree.set('from', '%s/%s' % (jid, resource))
+            
+            # lookup contacts interested in presence
+            roster = Roster(jid)
+            cjids = roster.getPresenceSubscribers()
+            
+            for cjid in cjids:
+                presTree.set('to', cjid)
+                msg.conn.server.launcher.router.route(msg, presTree, cjid)
         
         def cb(workReq, retVal):
-            pass
+            self.done = True
+            # make sure we pass the lastRetVal along
+            if retVal is None:
+                self.retVal = lastRetVal
+            else:
+                self.retVal = retVal
+        
+        req = threadpool.makeRequests(act, None, cb)
         
         def checkFunc():
-            return True
+            # need to poll manually or the callback's never called from the pool
+            poll(tpool)
+            return self.done
         
-        return FunctionCall(checkFunc), None
+        def initFunc():
+            tpool.putRequest(req[0])
+        
+        return FunctionCall(checkFunc), FunctionCall(initFunc)
     
     def resume(self):
         return self.retVal
+    
+class S2SPresenceHandler(Handler):
+    """Handles plain <presence> (without type) sent by the servers"""
+    def handle(self, tree, msg, lastRetVal=None):
+        try:
+            jid = JID(tree[0].get('to'))
+        except Exception, e:
+            return
+        
+        conns = msg.conn.server.launcher.servers[0].conns
+        
+        if jid.resource:
+            # locate the resource of this JID
+            def f(i):
+                return conns[i][0] == jid
+        else:
+            # locate all active resources of this JID
+            def f(i):
+                jidConn = conns[i]
+                if not jidConn[0]: return False
+                return jidConn[0].node == jid.node and jidConn[0].domain == jid.domain
+            
+        activeJids = filter(f, conns)
+        for con in activeJids:
+            conns[con][1].send(prepareDataForSending(tree[0]))
     
 class SubscriptionHandler(ThreadedHandler):
     """Handles subscriptions within <presence> stanzas. ie. <presence>

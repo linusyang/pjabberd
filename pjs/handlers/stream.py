@@ -5,6 +5,7 @@ import pjs.server
 import pjs.threadpool as threadpool
 
 from pjs.handlers.base import Handler, ThreadedHandler, chainOutput, poll
+from pjs.handlers.write import prepareDataForSending
 from pjs.utils import generateId, FunctionCall
 from pjs.elementtree.ElementTree import Element, SubElement
 
@@ -76,6 +77,16 @@ class InStreamReInitHandler(Handler):
             return lastRetVal
         
         # TODO: go to features-init
+        
+class OutStreamInitHandler(Handler):
+    """Handles the reply to our initiating s2s stream"""
+    def handle(self, tree, msg, lastRetVal=None):
+        # TODO: continue with features, auth, etc.
+        # for now, just assume it's localhost
+        
+        # forward any queued messages for this connection
+        out = prepareDataForSending(msg.conn.outQueue)
+        return chainOutput(lastRetVal, out)
 
 class FeaturesAuthHandler(Handler):
     """Handler for outgoing features after channel encryption."""
@@ -122,8 +133,8 @@ class NewS2SConnHandler(ThreadedHandler):
         def act():
             d = msg.conn.data
             if 'new-s2s-conn' not in d or \
-                'hostname' not in d or \
-                'ip' not in d:
+                'hostname' not in d['new-s2s-conn'] or \
+                'ip' not in d['new-s2s-conn']:
                 logging.warning("[NewS2SConnHandler] Invoked without necessary data in connection")
                 return
             

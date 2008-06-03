@@ -56,6 +56,10 @@ _corePhases = {
                              'description' : 'new stream where one already exists',
                              'handlers' : [h['in-stream-reinit']]
                              },
+          'out-stream-init' : {
+                               'description' : 'handling reply to our initial s2s stream',
+                               'handlers' : [h['out-stream-init'], h['write']]
+                               },
           'stream-end' : {
                           'description' : 'stream ended by the other side',
                           'handlers' : [h['stream-end']]
@@ -140,10 +144,10 @@ _c2sStanzaPhases = {
                  'xpath' : '{jabber:client}message',
                  'handlers' : []
                  },
-    'presence' : {
-                  'description' : 'incoming presence stanza',
+    'c2s-presence' : {
+                  'description' : 'incoming presence stanza from client',
                   'xpath' : '{jabber:client}presence',
-                  'handlers' : [h['presence']],
+                  'handlers' : [h['c2s-presence'], h['write']],
                   },
     'subscription' : {
                       'description' : 'subscription handling',
@@ -162,7 +166,13 @@ _s2sStanzaPhases = {
     'subscription' : {
                       'description' : 'subscription handling',
                       'xpath' : "{jabber:server}presence[@type]",
-                      'handlers' : []
+                      'handlers' : [],
+                      'priority' : 1
+                      },
+    's2s-presence' : {
+                      'description' : 'incoming presence from server',
+                      'xpath' : "{jabber:server}presence",
+                      'handlers' : [h['s2s-presence'], h['write']]
                       }
     }
 s2sStanzaPhases = PrioritizedDict(_s2sStanzaPhases)

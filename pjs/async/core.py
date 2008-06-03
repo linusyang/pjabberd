@@ -132,6 +132,9 @@ def poll(timeout=0.0, map=None):
                     raise
                 else:
                     return
+                
+        # pick up results from Messages and process queued
+        pjs.events.pickupResults()
 
         for fd in r:
             obj = map.get(fd)
@@ -153,9 +156,6 @@ def poll(timeout=0.0, map=None):
         
     if func_map:
         funcCheck()
-        
-    # pick up results from Messages and process queued
-    pjs.events.pickupResults()
 
 def poll2(timeout=0.0, map=None):
     # Use the poll() support added to the select module in Python 2.0
@@ -183,6 +183,10 @@ def poll2(timeout=0.0, map=None):
             if err[0] != EINTR:
                 raise
             r = []
+            
+        # pick up results from Messages and process queued
+        pjs.events.pickupResults()
+        
         for fd, flags in r:
             obj = map.get(fd)
             if obj is None:
@@ -192,9 +196,6 @@ def poll2(timeout=0.0, map=None):
     if func_map:
         funcCheck()
         
-    # pick up results from Messages and process queued
-    pjs.events.pickupResults()
-
 poll3 = poll2                           # Alias for backward compatibility
 
 def funcCheck():

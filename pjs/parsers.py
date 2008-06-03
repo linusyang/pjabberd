@@ -95,7 +95,11 @@ class IncrStreamParser:
             
             # handle <stream>, record it for XPath wrapping
             self.stream = et.Element(self._fixname(tag), attrs)
-            Dispatcher().dispatch(self.stream, self.conn, 'in-stream-init')
+            if 'id' in attrs:
+                # s2s connection
+                Dispatcher().dispatch(self.stream, self.conn, 'out-stream-init')
+            else:
+                Dispatcher().dispatch(self.stream, self.conn, 'in-stream-init')
         elif self.depth == 2:
             # handle stanzas, build tree
             self.tree = et.TreeBuilder()

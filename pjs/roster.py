@@ -201,8 +201,31 @@ class Roster:
         
         return sub
     
+    def getPresenceSubscribers(self):
+        """Returns a list of JIDs of contacts of this user who are interested
+        in the user's presence info.
+        """
+        c = DB().cursor()
+        c.execute("SELECT jids.jid\
+                   FROM roster\
+                   JOIN jids ON jids.id = roster.contactid\
+                   WHERE roster.userid = ? AND\
+                       roster.subscription IN (?, ?, ?)",
+                       (self.uid, Subscription.FROM,
+                        Subscription.FROM_PENDING_OUT, Subscription.BOTH))
+        jids = []
+        res = c.fetchall()
+        for row in res:
+            jids.append(row[0])
+            
+        c.close()
+        
+        return jids
+    
     def loadRoster(self):
-        """Loads the roster for this JID"""
+        """Loads the roster for this JID. Must be used before calling
+        getAsTree().
+        """
         c = DB().cursor()
         # get the contactid, name and subscriptions
         c.execute("SELECT roster.contactid, roster.name,\
@@ -234,7 +257,9 @@ class Roster:
         c.close()
     
     def getAsTree(self):
-        """Returns the roster Element tree starting from <query>"""
+        """Returns the roster Element tree starting from <query>. Call
+        loadRoster() before this.
+        """
         query = Element('query', {'xmlns' : 'jabber:iq:roster'})
         for item in self.items:
             query.append(self.items[item].getAsTree())

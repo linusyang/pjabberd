@@ -1,6 +1,7 @@
 import pjs.handlers.base
 import pjs.conf.conf
 import logging
+import socket
 
 from pjs.conf.phases import corePhases, c2sStanzaPhases, s2sStanzaPhases
 from pjs.conf.handlers import handlers as h
@@ -206,21 +207,26 @@ def pickupResults():
     """Picks up any available results on the result queue and calls
     runMessages() to continue processing the queue.
     """
-    try:
-        connId, out = resultQ.get_nowait()
-        for server in activeServers:
-            if connId in server.conns:
-                conn = server.conns[connId][1]
-                conn.send(prepareDataForSending(out))
-                break
-        else:
-            # message left on the queue for a connection that's no longer
-            # there, so we log it and move on
-            logging.warning("[events] Connection id %d has no corresponding" +\
-                            " Connection object. Dropping result from queue.", connId)
-        del _runningMessages[connId]
-    except Empty:
-        pass
+    while 1:
+        try:
+            connId, out = resultQ.get_nowait()
+            for server in activeServers:
+                if connId in server.conns:
+                    conn = server.conns[connId][1]
+                    # FIXME: this should be prevented
+                    try:
+                        conn.send(prepareDataForSending(out))
+                    except socket.error, e:
+                        logging.warning("[pickupResults] Socket error: %s", e)
+                    break
+            else:
+                # message left on the queue for a connection that's no longer
+                # there, so we log it and move on
+                logging.warning("[events] Connection id %d has no corresponding" +\
+                                " Connection object. Dropping result from queue.", connId)
+            del _runningMessages[connId]
+        except Empty:
+            break
         
     _runMessages()
     

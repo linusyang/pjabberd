@@ -22,6 +22,10 @@ handlers = {
                              'handler' : pjs.handlers.stream.InStreamInitHandler,
                              'description' : 'initializes the stream'
                              },
+            'out-stream-init' : {
+                                 'handler' : pjs.handlers.stream.OutStreamInitHandler,
+                                 'description' : 'handles reply to our s2s stream'
+                                 },
             'in-stream-reinit' : {
                                'handler' : pjs.handlers.stream.InStreamReInitHandler,
                                'description' : 'reinitializes the stream'
@@ -80,10 +84,14 @@ handlers = {
                              'description' : 'uses the last return value to push ' +\
                                              'the roster change to all connected resources'
                              },
-            'presence' : {
-                          'handler' : pjs.handlers.presence.PresenceHandler,
-                          'description' : 'handles plain presence notifications'
-                          },
+            'c2s-presence' : {
+                              'handler' : pjs.handlers.presence.C2SPresenceHandler,
+                              'description' : 'handles plain presence from clients'
+                              },
+            's2s-presence' : {
+                              'handler' : pjs.handlers.presence.S2SPresenceHandler,
+                              'description' : 'handles plain presence from servers'
+                              },
             'subscription' : {
                               'handler' : pjs.handlers.presence.SubscriptionHandler,
                               'description' : 'takes care of subscriptions'

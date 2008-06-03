@@ -3,7 +3,6 @@ import socket
 
 from pjs.connection import Connection, LocalTriggerConnection, ClientConnection, ServerInConnection, ServerOutConnection
 from pjs.async.core import dispatcher
-from pjs.router import Router
 
 class Server(dispatcher):
     def __init__(self, ip, port, launcher):
@@ -23,15 +22,6 @@ class Server(dispatcher):
         self.bind((ip, port))
         self.listen(5)
         
-        # see connection.LocalTriggerConnection.__doc__
-        self.triggerConn = LocalTriggerConnection(self.ip, self.port)
-        
-        def notifyFunc():
-            self.triggerConn.send(' ')
-        
-        # TODO: make this configurable
-        self.threadpool = threadpool.ThreadPool(5, notifyFunc=notifyFunc)
-        
         # Server-wide data. ie. used for finding all connections for a certain
         # JID.
         # TODO: make this accessible even when the server's clustered
@@ -42,6 +32,9 @@ class Server(dispatcher):
 #                                                   'resource' : <Connection obj>
 #                                                   }
         self.data['info'] = {}
+        
+    def createThreadpool(self, numWorkers, notifyFunc=None):
+        self.threadpool = threadpool.ThreadPool(numWorkers, notifyFunc=notifyFunc)
         
     def handle_accept(self):
         sock, addr = self.accept()
@@ -79,5 +72,7 @@ class S2SServer(Server):
     def handle_accept(self):
         sock, addr = self.accept()
         conn = ServerInConnection(sock, addr, self)
+        # TODO: don't assume localhost here
+        self.s2sConns.setdefault('localhost', [None, None])[0] = conn
         # we don't know the hostname until stream starts
         self.conns[conn.id] = (None, conn)
