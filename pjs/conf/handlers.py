@@ -6,6 +6,7 @@ import pjs.handlers.stream
 import pjs.handlers.iq
 import pjs.handlers.auth
 import pjs.handlers.presence
+import pjs.handlers.message
 import pjs.handlers.route
 
 # TODO: add functions to fetch handlers from the config file
@@ -96,6 +97,14 @@ handlers = {
             'iq-auth-set' : {
                              'handler' : pjs.handlers.auth.IQAuthSetHandler,
                              'description' : 'responds to the iq auth set query'
+                             },
+            'c2s-message' : {
+                             'handler' : pjs.handlers.message.C2SMessageHandler,
+                             'description' : '<message> from client'
+                             },
+            's2s-message' : {
+                             'handler' : pjs.handlers.message.S2SMessageHandler,
+                             'description' : '<message> from server'
                              },
             'c2s-presence' : {
                               'handler' : pjs.handlers.presence.C2SPresenceHandler,

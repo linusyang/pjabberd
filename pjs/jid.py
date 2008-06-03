@@ -1,4 +1,5 @@
 import re
+from pjs.db import DBautocommit
 
 class JID:
     """Models a JID"""
@@ -21,6 +22,17 @@ class JID:
         
     def getBare(self):
         return '%s@%s' % (self.node, self.domain)
+    
+    def exists(self):
+        """Returns True if this JID exists in the DB"""
+        c = DBautocommit().cursor()
+        c.execute("SELECT jid FROM jids WHERE jid = ? AND password != ''",
+                  (self.getBare(),))
+        res = c.fetchone()
+        if res:
+            return True
+        else:
+            return False
         
     def __cmp__(self, other):
         assert isinstance(other, JID)

@@ -116,7 +116,7 @@ _c2sStanzaPhases = {
     'message' : {
                  'description' : 'incoming message stanza',
                  'xpath' : '{jabber:client}message',
-                 'handlers' : []
+                 'handlers' : [h['c2s-message']]
                  },
     'c2s-presence' : {
                   'description' : 'incoming presence stanza from client',
@@ -173,6 +173,11 @@ _s2sStanzaPhases = {
                      'xpath' : "{jabber:server}presence[@type='probe']",
                      'handlers' : [h['s2s-probe']],
                      'priority' : 2
-                     }
+                     },
+    'message' : {
+                 'description' : '<message>',
+                 'xpath' : "{jabber:server}message",
+                 'handlers' : [h['s2s-message']]
+                 }
     }
 s2sStanzaPhases = PrioritizedDict(_s2sStanzaPhases)
