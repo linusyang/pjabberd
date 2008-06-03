@@ -33,9 +33,20 @@ class C2SPresenceHandler(ThreadedHandler):
             roster = Roster(jid)
             cjids = roster.getPresenceSubscribers()
             
+            retVal = lastRetVal
+            # TODO: replace this with another router phase that would send
+            # it out to all cjids in a batch instead of queuing a handler
+            # for each
             for cjid in cjids:
                 presTree.set('to', cjid)
-                msg.conn.server.launcher.router.routeToServer(msg, presTree, cjid)
+                d = {
+                     'to' : cjid,
+                     'data' : presTree
+                     }
+                retVal = chainOutput(retVal, d)
+                msg.setNextHandler('route-server')
+                
+            return retVal
         
         def cb(workReq, retVal):
             self.done = True
@@ -72,7 +83,13 @@ class S2SPresenceHandler(Handler):
             return data
         
         logging.debug("[%s] Routing %s", self.__class__, tostring(tree[0]))
-        msg.conn.server.launcher.router.routeToClient(msg, tree[0], tree[0].get('to'), rewriteTo)
+        d = {
+             'to' : tree[0].get('to'),
+             'data' : tree[0],
+             'preprocessingFunc' : rewriteTo
+             }
+        msg.setNextHandler('route-client')
+        return chainOutput(lastRetVal, d)
     
 class S2SSubscriptionHandler(ThreadedHandler):
     """Handles subscriptions sent from servers within <presence> stanzas.

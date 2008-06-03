@@ -174,25 +174,32 @@ class IQRosterUpdateHandler(ThreadedHandler):
                                                           % (jid, cjid)
                 out += "<presence from='%s' to='%s' type='unsubscribed'/>" \
                                                           % (jid, cjid)
-                msg.conn.server.launcher.router.routeToServer(msg, out, cjid)
-                roster.removeContact(cjid)
-                query = deepcopy(tree[0][0])
-                msg.setNextHandler('roster-push')
-                
                 # create unavailable presence stanzas for all resources of the user
                 resources = msg.conn.server.launcher.getC2SServer().data['resources']
                 jidForResources = resources.has_key(jid) and resources[jid]
                 if jidForResources:
-                    out = u''
                     #logging.debug("!!! jidForResources: %d", len(jidForResources))
                     for i in jidForResources:
                         out += "<presence from='%s/%s'" % (jid, i)
                         out += " to='%s' type='unavailable'/>" % cjid
                     #logging.debug("!!! About to route %s", out)
-                    # and route it
-                    msg.conn.server.launcher.router.routeToServer(msg, out, cjid)
+                    
+                # prepare routing data
+                d = {
+                     'to' : cjid,
+                     'data' : out
+                     }
                 
-                return chainOutput(lastRetVal, query)
+                roster.removeContact(cjid)
+                query = deepcopy(tree[0][0])
+                
+                retVal = chainOutput(lastRetVal, query)
+
+                # route the presence first, then do a roster push
+                msg.setNextHandler('roster-push')
+                msg.setNextHandler('route-server')
+                
+                return chainOutput(retVal, d)
             
             # we're updating/adding the roster item
             
