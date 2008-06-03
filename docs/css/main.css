@@ -1,0 +1,20 @@
+html, body {
+	font-family: "Lucida Sans", "Lucida";
+	font-size: 10pt;
+	line-height: 1.5em;
+}
+
+h1, h2 {
+	border-bottom: 1px solid black;
+}
+
+code {
+	padding: 0 0.5em;
+	background-color: #e4ffbb;
+}
+
+pre code {
+	display: block;
+	padding: 0.5em;
+}
+

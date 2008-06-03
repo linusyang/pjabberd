@@ -1,0 +1,70 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<html>
+<head>
+<link rel='stylesheet' href='css/main.css' type='text/css' />
+<title>PJabberd Design Doc</title>
+</head>
+<body>
+<h1>Pjabberd Design Doc</h1>
+
+<h2>Introduction</h2>
+
+<p><a href="http://www.xmpp.org/">XMPP</a>, previously known as Jabber, is an open protocol for messaging and presence. It's designed for push-style data distribution between network entities in near real-time. The core protocol is described in two RFCs, although many <a href="http://www.xmpp.org/extensions/">extensions</a> are listed on the XMPP web site. <a href="http://www.xmpp.org/rfcs/rfc3920.html">RFC 3920</a> and <a href="http://www.xmpp.org/rfcs/rfc3921.html">3921</a> describe concepts like streams, stanzas, authentication procedures, resource binding, the Instant Messaging (IM) aspect of XMPP, and others. XMPP is based on clients and servers—both are required. Clients connect to servers and send messages to other clients through them.</p>
+
+<p>The adoption of the protocol has been steadily increasing. Many commercial entities, such as TiVo and Jive Software, use it in their products. Google's XMPP-based Talk application has thousands of users world-wide.</p>
+
+<p><a href="http://python.org/">Python</a> is a dynamic object-oriented programming language with extensive support of Internet protocols. It's fairly popular, easy to learn, very appropriate for prototyping, yet lacks a usable XMPP server implementation.</p>
+
+<h2>Goal</h2>
+
+<p>The goal of this project is to create a framework for XMPP servers. It would provide the basic components and some helpful tools for creating concrete implementations. The goal is not to create a single monolithic server (like Openfire, for example).</p>
+
+<h2>Design Choices</h2>
+
+<p>The specific design choices are documented below.</p>
+
+<h3>XML Representation</h3>
+
+<p><a href="http://effbot.org/zone/element-index.htm">ElementTree</a> is the XML library used throughout the framework. We needed XPath support, so we bundled the 1.3alpha3 version with pjabberd. Handlers are passed the parsed messages via the <code>tree</code> parameter as an instance of the <code>Element</code> class. ElementTree's parser (expat) strips the <code>xmlns</code> attributes on XML elements and changes &lt;elementname&gt; to &lt;{namespace}elementname&gt;. In order to send out uniform XML, all handlers should use <code>tostring()</code> found in <code>pjs.utils</code>, and not ElementTree's <code>tostring()</code>, since the latter produces incorrect namespaces.</p>
+
+<h3>Asynchronous Connections</h3>
+
+<p>Pjabberd uses asynchronous connections. There is only a single process that accepts and processes connections. This was done for the following reasons:</p>
+
+<ol>
+<li><p>It has worked well for <a href="http://www.danga.com/djabberd/">DJabberd</a>. It's written in Perl, which is interpreted like Python and comparable in terms of performance.</p></li>
+<li><p>Unlike HTTP, Jabber connections persist for a long time, so it is beneficial to have low per-connection memory overhead. The asynchronous design allows for it, because new threads aren't being spawned for every connection.</p></li>
+<li><p>Python's threading performance is limited by the GIL (global interpreter lock), which allows only one thread to run inside a single interpreter at a time. Therefore, adding more threads to the server would only decrease performance due to thread-switching overhead.</p></li>
+<li><p>The <a href="http://twistedmatrix.com/trac/">Twisted</a> framework developers have been successful in implementing a similar concept.</p></li>
+</ol>
+
+<p>This design implies that only one connection/message is being processed at a time. However, many tasks that an XMPP server must perform (such as authentication) require some form of blocking I/O, such as accessing a database. With asynchronous connections, all code running in the main thread cannot block for any reason. If it does, it will hold up the entire server. Pjabberd solves this problem by allowing individual handlers (see <a href="#chained-handlers">chained handlers</a>) to run outside the main thread.</p>
+
+<p><img src="async.png" alt="Asynchronous connections" title="" /></p>
+
+<p><a name="chained-handlers"></a></p>
+
+<h3>Phases</h3>
+
+<p>Every message that comes in is assigned a "phase", a sequence of handlers. The phases are configured in <code>pjs.conf.phases</code> and <code>pjs.conf.handlers</code>. Each phase distinguishes itself from others by its XPath expression. The current version of ElementTree only support basic operations, such as matching on tag name and attributes. The phases are checked in random order, because in Python dictionaries have no order. However, if there are two or more conflicting phases, higher priorities can be assigned to create an artificial ordering. An example of this is 'c2s-presence' and 'subscription' phases for the c2s server. 'c2s-presence' matches on '{jabber:client}presence' and 'subscription' matches on '{jabber:client}presence[@type]'. If there were no priorities in phase lists, a subscription could be interpreted as a simple presence stanza.</p>
+
+<p>Phases define the regular and error handlers (see below) associated with phase. The list can be queried and modified at runtime by handlers to queue others (via <code>Message</code>'s <code>setNextHandler()</code> and <code>setLastHandler()</code>).</p>
+
+<h3>Chained Handlers</h3>
+
+<p>When an XMPP stanza is taken off the wire, it can be handled by any class that subclasses either <code>Handler</code> or <code>ThreadedHandler</code> from <code>pjs.handlers.base</code>. If a class subclasses <code>Handler</code> then its <code>handle()</code> method is executed. If a class subclasses <code>ThreadedHandler</code> then its <code>handle()</code> method is executed, but it needs to return a tuple of <code>FunctionCall</code> objects (from <code>pjs.utils</code>) that specify how a thread should be started and how it can be checked for completion. When the thread-checking function returns <code>True</code>, the handler's <code>resume()</code> function is called, so that it may collect the result or do some cleanup. The <code>ThreadedHandler</code> classes are responsible for launching their own threads and cleaning up after themselves. The framework only knows that a <code>ThreadedHandler</code> needs to do some work that might take a while, so it lets it do whatever it needs until the checking function returns <code>True</code>. As a convenience, each server in the framework has a threadpool associated with it that handlers can drop jobs onto and retrieve results. Many classes in <code>pjs.handlers</code> use this approach. See <code>SASLResponseHandler</code> in <code>pjs.handlers.auth</code> for an example.</p>
+
+<p>The handlers are chained. This means that for any type of message (as defined below) there can be a sequence of handlers that run on that message. Only one handler per message runs at a time even if the current handler is executing in another thread. The same message is passed to each handler in the chain. It can be modified by handlers, but this should probably be avoided as it will result in hard-to-debug code. If a handler needs to modify a message, it should <code>deepcopy()</code> it.</p>
+
+<p>Each handler can pass the next handler in the chain some data through the <code>lastRetVal</code> parameter in <code>handle()</code> by returning a value from <code>handle()</code>. If it doesn't return anything, the <code>lastRetVal</code> is preserved and passed to the next handler. However, if a handler returns a value it will overwrite the <code>lastRetVal</code> for future handlers. Most handlers will probably want to attach a value to <code>lastRetVal</code> -- such handlers should use the <code>chainOutput()</code> function from <code>pjs.handlers.base</code>. This is how a roster push currently occurs: the handler that accepts an "iq get" message chains the roster stanza that should be sent to all of the client's connected resources. A handler can stop the chain by setting <code>stopChain</code> in the <code>Message</code> object to <code>True</code>.</p>
+
+<p>The chained handlers design also allows for handling unexpected exceptions. Each handler can be paired with an "error handler" in the same phase. The error handler's <code>handle()</code> method will be executed with the exception being the last element in <code>lastRetVal</code>. If the error handler (A) throws another exception, the next handler is skipped and its error handler (B) is run. If A does not throw and exception then B's regular handler will run next.</p>
+
+<p><img src="handlers.png" alt="" title="" /></p>
+
+<h2>Data Persistence</h2>
+
+<h2>Internal Data</h2>
+
+<div style="display:none">:wrap=soft:maxLineLen=100:noTabs=false:</div>
+</body></html>
