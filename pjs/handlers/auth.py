@@ -282,7 +282,7 @@ class IQAuthSetHandler(ThreadedHandler):
             
             # do the resource binding
             # TODO: check that we don't already have such a resource
-            jid = bindResource(msg, resource)
+            bindResource(msg, resource)
             
             data['iqauth']['complete'] = True
             

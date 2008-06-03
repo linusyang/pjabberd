@@ -8,21 +8,28 @@ from pjs.utils import tostring, generateId, FunctionCall
 from copy import deepcopy
 
 def bindResource(msg, resource):
-    """Records the resource binding. Returns the bare JID."""
-    msg.conn.data['user']['resource'] = resource
-            
+    """Records the resource binding. Returns the bare JID.
+    This should only be called from the C2Sserver.
+    """
+    data = msg.conn.data
+    server = msg.conn.server
+    jid = data['user']['jid']
+    
+    # check if we have this resource already
+    if server.data['resources'].has_key(jid) and \
+    server.data['resources'][jid].has_key(resource):
+        # create our own
+        resource = resource + generateId()[:6]
+    data['user']['resource'] = resource
+    
     # record the resource in the JID object of the (JID, Connection) pair
     # this is for local delivery lookups
-    msg.conn.server.conns[msg.conn.id][0].resource = resource
-    
-    jid = msg.conn.data['user']['jid']
+    server.conns[msg.conn.id][0].resource = resource
     
     # save the jid/resource in the server's global storage
-    msg.conn.server.data['resources'][jid] = {
-                                              resource : msg.conn
-                                              }
-    
-    return jid
+    if not server.data['resources'].has_key(jid):
+        server.data['resources'][jid] = {}
+    server.data['resources'][jid][resource] = msg.conn
 
 class IQBindHandler(Handler):
     """Handles resource binding"""
@@ -32,15 +39,14 @@ class IQBindHandler(Handler):
         if id:
             bind = iq[0]
             if len(bind) > 0:
-                # accept id
-                # TODO: check if id is available
                 resource = bind[0].text
             else:
                 # generate an id
                 resource = generateId()[:6]
             
             # TODO: check that we don't already have such a resource
-            jid = bindResource(msg, resource)
+            jid = msg.conn.data['user']['jid']
+            bindResource(msg, resource)
                 
             res = Element('iq', {'type' : 'result', 'id' : id})
             bind = Element('bind', {'xmlns' : 'urn:ietf:params:xml:ns:xmpp-bind'})
