@@ -61,7 +61,7 @@ class C2SPresenceHandler(ThreadedHandler):
                     probeTree.set('to', cjid)
                     probeRouteData = {
                                       'to' : cjid,
-                                      'data' : probeTree
+                                      'data' : deepcopy(probeTree)
                                       }
                     probes.append(probeRouteData)
                     # they're sent first. see below

@@ -6,7 +6,7 @@ class JID:
 
     # TODO: fix this to do stringprep and abide by the size limits in
     # RFC 3920 section 3.1.
-    jidre = re.compile(r'((\w*)@)?([\w.]+)(/(\w+))?', re.I)
+    jidre = re.compile(r'((\w*)@)?([\w.]+)(/(.+))?', re.I)
     
     def __init__(self, jid):
         """Tries to create a JID out of 'jid'. Raises an exception if the JID
