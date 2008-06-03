@@ -1,8 +1,9 @@
 import pjs.threadpool as threadpool
 import socket
 
-from pjs.connection import Connection, LocalTriggerConnection, ClientConnection, ServerInConnection, ServerOutConnection
+from pjs.connection import Connection, ClientConnection, ServerInConnection, ServerOutConnection
 from pjs.async.core import dispatcher
+from pjs.utils import SynchronizedDict
 
 class Server(dispatcher):
     def __init__(self, ip, port, launcher):
@@ -12,7 +13,7 @@ class Server(dispatcher):
         # this includes both c2s and s2s connections
         # used by dispatchers to look up connections
         # {connId => (JID, Connection)}
-        self.conns = {}
+        self.conns = SynchronizedDict()
         
         self.ip = ip
         self.hostname = ip
@@ -26,8 +27,9 @@ class Server(dispatcher):
         # JID.
         # TODO: make this accessible even when the server's clustered
         #       ie. different machines should be able to access this.
-        self.data = {}
+        self.data = SynchronizedDict()
         self.data['info'] = {}
+        
         
     def createThreadpool(self, numWorkers, notifyFunc=None):
         self.threadpool = threadpool.ThreadPool(numWorkers, notifyFunc=notifyFunc)
@@ -65,7 +67,7 @@ class S2SServer(Server):
         self.data['info']['type'] = 's2s'
         
         # {'domain' => [<Connection> for in, <Connection> for out]}
-        self.s2sConns = {}
+        self.s2sConns = SynchronizedDict()
         
     def createOutConnection(self, sock):
         conn = ServerOutConnection(sock, sock.getsockname(), self)

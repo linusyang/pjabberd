@@ -1,4 +1,6 @@
+from threading import RLock
 from random import random
+
 try:
     # python >= 2.5
     from hashlib import sha1
@@ -83,3 +85,99 @@ def decurl(tagName):
     else:
         tag = res[:end]
     return res, tag
+
+class PrioritizedDict(dict):
+    """A dictionary that has order during iteration based on a 'priority'
+    key of every key/value pair. The higher the priority value the earlier
+    the pair will come in an iteration.
+    
+    Example: d = {'a' : {'name' : 'A'}, 'b' : {'name' : 'B', 'priority' : 1}}
+    When iterated over, the 'b' pair with priority 1 will come first, since the
+    default priority is 0.
+    """
+    def __init__(self, d=None):
+        self.priolist = []
+        if d is not None:
+            dict.__init__(self, d)
+            self.reprioritize()
+        else:
+            dict.__init__(self)
+    def reprioritize(self):
+        self.priolist = dict.keys(self)
+        self.priolist.sort(cmp=self.compare)
+    def compare(self, x, y):
+        return dict.get(self, y).get('priority', 0) - dict.get(self, x).get('priority', 0)
+    def __iter__(self):
+        for i in self.priolist:
+            yield i
+    def __setitem__(self, key, value):
+        dict.__setitem__(self, key, value)
+        self.reprioritize()
+    def __delitem__(self, key):
+        dict.__delitem__(self, key)
+        self.reprioritize()
+    iterkeys = __iter__
+        
+#dd = {
+#      'a' : { 'name' : 'a', 'priority' : 1},
+#      'b' : { 'name' : 'b', 'priority' : 2},
+#      'c' : { 'name' : 'c',}
+#      }
+#d = PrioritizedDict()
+#d['a'] = { 'name' : 'a', 'priority' : 1}
+#d['b'] = { 'name' : 'b', 'priority' : 2}
+#d['c'] = { 'name' : 'c',}
+#
+#for i in d:
+#    print d[i]
+
+class SynchronizedDict(dict):
+    """A dictionary that only allows one thread to access or modify it
+    at a time.
+    """
+    def __init__(self, d=None):
+        self.lock = RLock()
+        self.lock.acquire()
+        try:
+            if d is not None:
+                dict.__init__(self, d)
+            else:
+                dict.__init__(self)
+        finally:
+            self.lock.release()
+            
+    def __getitem__(self, key):
+        self.lock.acquire()
+        try:
+            return dict.__getitem__(self, key)
+        finally:
+            self.lock.release()
+            
+    def __setitem__(self, key, value):
+        self.lock.acquire()
+        try:
+            dict.__setitem__(self, key, value)
+        finally:
+            self.lock.release()
+            
+    def __delitem__(self, key):
+        self.lock.acquire()
+        try:
+            dict.__delitem__(self, key)
+        finally:
+            self.lock.release()
+    
+    def __len__(self):
+        self.lock.acquire()
+        try:
+            return dict.__len__(self)
+        finally:
+            self.lock.release()
+            
+    def __iter__(self):
+        self.lock.acquire()
+        try:
+            for k in dict.keys(self):
+                yield k
+        finally:
+            self.lock.release()

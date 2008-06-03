@@ -66,9 +66,9 @@ class IncrStreamParser:
         be parsed and the appropriate events dispatched. The incomplete XML
         will be buffered.
         """
-        if data != ' ':
-            logging.debug("[%s] For connection %s parser got: %s",
-                          self.__class__, self.conn.id, data)
+#        if data != ' ':
+#            logging.debug("[%s] For connection %s parser got: %s",
+#                          self.__class__, self.conn.id, data)
         self._parser.Parse(data, 0)
 
     def close(self):

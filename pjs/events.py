@@ -187,6 +187,9 @@ _runningMessages = {}
 # The queue of messages waiting to be processed. A message is queued if
 # there is another message for the same connection currently being
 # processed.
+# We're not using a deque here because we occasionally need to traverse
+# the queue (worst case -- all but last connections already have messages
+# being processed for them, till the end)
 # [(connId, Message), ...]
 _processingQ = []
 

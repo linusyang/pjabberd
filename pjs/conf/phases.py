@@ -1,55 +1,10 @@
 """ List of phases and their descriptions """
 
 from pjs.conf.handlers import handlers as h
+from pjs.utils import PrioritizedDict
 
 # TODO: add functions to fetch phases from the config file
 # TODO: add ordering to phases, so that we can decide on conflicts
-
-class PrioritizedDict(dict):
-    """A dictionary that has order during iteration based on a 'priority'
-    key of every key/value pair. The higher the priority value the earlier
-    the pair will come in an iteration.
-    
-    Example: d = {'a' : {'name' : 'A'}, 'b' : {'name' : 'B', 'priority' : 1}}
-    When iterated over, the 'b' pair with priority 1 will come first, since the
-    default priority is 0.
-    """
-    def __init__(self, d=None):
-        self.priolist = []
-        if d is not None:
-            dict.__init__(self, d)
-            self.reprioritize()
-        else:
-            dict.__init__(self)
-    def reprioritize(self):
-        self.priolist = dict.keys(self)
-        self.priolist.sort(cmp=self.compare)
-    def compare(self, x, y):
-        return dict.get(self, y).get('priority', 0) - dict.get(self, x).get('priority', 0)
-    def __iter__(self):
-        for i in self.priolist:
-            yield i
-    def __setitem__(self, key, value):
-        dict.__setitem__(self, key, value)
-        self.reprioritize()
-    def __delitem__(self, key):
-        dict.__delitem__(self, key)
-        self.reprioritize()
-    iterkeys = __iter__
-        
-#dd = {
-#      'a' : { 'name' : 'a', 'priority' : 1},
-#      'b' : { 'name' : 'b', 'priority' : 2},
-#      'c' : { 'name' : 'c',}
-#      }
-#d = PrioritizedDict()
-#d['a'] = { 'name' : 'a', 'priority' : 1}
-#d['b'] = { 'name' : 'b', 'priority' : 2}
-#d['c'] = { 'name' : 'c',}
-#
-#for i in d:
-#    print d[i]
-
 
 # XMPP core phases (stream, init, db, sasl, tls, etc. no stanzas like iq/message/presence)
 _corePhases = {
@@ -75,7 +30,6 @@ _corePhases = {
           'features' : {
                         'description' : 'stream features such as TLS and resource binding',
                         'xpath' : '{http://etherx.jabber.org/streams}features',
-                        'handlers' : []
                         },
           'sasl-auth' : {
                          'description' : 'SASL\'s <auth>',
@@ -98,12 +52,10 @@ _corePhases = {
           'db-result' : {
                          'description' : 'result of dialback coming from the other server',
                          'xpath' : '{jabber:server:dialback}result',
-                         'handlers' : []
                          },
           'db-verify' : {
                          'description' : 'verification of the dialback key',
                          'xpath' : '{jabber:server:dialback}verify',
-                         'handlers' : []
                          },
           'test' : {
                     'description' : 'test phase for simple tests',
@@ -162,7 +114,13 @@ _c2sStanzaPhases = {
                       'xpath' : "{jabber:client}presence[@type]",
                       'handlers' : [h['c2s-subscription']],
                       'priority' : 1
-                      }
+                      },
+    'unknown-iq' : {
+                    'description' : 'unknown iq stanza',
+                    'xpath' : '{jabber:client}iq',
+                    'handlers' : [h['iq-not-implemented'], h['write']],
+                    'priority' : -1
+                    }
     }
 c2sStanzaPhases = PrioritizedDict(_c2sStanzaPhases)
 
