@@ -181,3 +181,10 @@ class SynchronizedDict(dict):
                 yield k
         finally:
             self.lock.release()
+            
+    def __contains__(self, item):
+        self.lock.acquire()
+        try:
+            return dict.__contains__(self, item)
+        finally:
+            self.lock.release()
