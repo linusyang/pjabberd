@@ -69,5 +69,14 @@ handlers = {
             'iq-roster-get' : {
                                'handler' : pjs.handlers.iq.IQRosterGetHandler,
                                'description' : 'handles roster get requests'
-                               }
+                               },
+            'iq-roster-update' : {
+                                  'handler' : pjs.handlers.iq.IQRosterUpdateHandler,
+                                  'description' : 'handles roster add/update requests'
+                                  },
+            'roster-push' : {
+                             'handler' : pjs.handlers.iq.RosterPushHandler,
+                             'description' : 'uses the last return value to push ' +\
+                                             'the roster change to all connected resources'
+                             }
             }

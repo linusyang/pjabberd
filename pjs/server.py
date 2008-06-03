@@ -29,6 +29,16 @@ class Server(dispatcher):
         # TODO: make this configurable
         self.threadpool = threadpool.ThreadPool(5, notifyFunc=notifyFunc)
         
+        # Server-wide data. ie. used for finding all connections for a certain
+        # JID.
+        # TODO: make this accessible even when the server's clustered
+        #       ie. different machines should be able to access this.
+        self.data = {}
+        self.data['resources'] = {}
+#        self.data['resources']['tro@localhost'] = {
+#                                                   'resource' : <Connection obj>
+#                                                   }
+        
     def handle_accept(self):
         sock, addr = self.accept()
         conn = Connection(sock, addr, self)

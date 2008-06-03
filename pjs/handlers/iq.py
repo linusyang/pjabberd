@@ -25,12 +25,18 @@ class IQBindHandler(Handler):
             # TODO: check that we don't already have such a resource
             
             msg.conn.data['user']['resource'] = resource
+            jid = msg.conn.data['user']['jid']
+            
+            # save the jid/resource in the server's global storage
+            msg.conn.server.data['resources'][jid] = {
+                                                      resource : msg.conn
+                                                      }
                 
             res = Element('iq', {'type' : 'result', 'id' : id})
             bind = Element('bind', {'xmlns' : 'urn:ietf:params:xml:ns:xmpp-bind'})
-            jid = Element('jid')
-            jid.text = '%s/%s' % (msg.conn.data['user']['jid'], resource)
-            bind.append(jid)
+            jidEl = Element('jid')
+            jidEl.text = '%s/%s' % (jid, resource)
+            bind.append(jidEl)
             res.append(bind)
             
             return chainOutput(lastRetVal, res)
@@ -74,23 +80,20 @@ class IQRosterGetHandler(ThreadedHandler):
             resource = msg.conn.data['user']['resource']
             id = tree[0].get('id')
             if id is None:
-                logging.warning('[roster] No id in roster query. Tree: %s', tree[0])
+                logging.warning('[roster] No id in roster get query. Tree: %s', tree[0])
                 # TODO: throw exception here
                 return
             
             c = DB().cursor()
             # get the contactid, name and subscriptions
-            try:
-                c.execute("SELECT roster.contactid, roster.name,\
-                                  substates.primaryName subscription,\
-                                  contactjids.jid cjid\
-                           FROM roster\
-                               JOIN jids AS userjids ON roster.userid = userjids.id\
-                               JOIN jids AS contactjids ON roster.contactid = contactjids.id\
-                               JOIN substates ON substates.stateid = roster.subscription\
-                           WHERE userjids.jid = ?", (jid,))
-            except Exception, e:
-                print e
+            c.execute("SELECT roster.contactid, roster.name,\
+                              substates.primaryName subscription,\
+                              contactjids.jid cjid\
+                       FROM roster\
+                           JOIN jids AS userjids ON roster.userid = userjids.id\
+                           JOIN jids AS contactjids ON roster.contactid = contactjids.id\
+                           JOIN substates ON substates.stateid = roster.subscription\
+                       WHERE userjids.jid = ?", (jid,))
             
             roster = Roster()
             
@@ -98,14 +101,11 @@ class IQRosterGetHandler(ThreadedHandler):
                 roster.addItem(row['contactid'], RosterItem(row['cjid'], row['name'], row['subscription']))
             
             # get the groups now for each cid
-            try:
-                c.execute("SELECT rgi.contactid, rgs.name\
-                           FROM rostergroups AS rgs\
-                               JOIN rostergroupitems AS rgi ON rgi.groupid = rgs.groupid\
-                               JOIN jids ON rgs.userid = jids.id\
-                           WHERE jids.jid = ?", (jid,))
-            except Exception, e:
-                print e
+            c.execute("SELECT rgi.contactid, rgs.name\
+                       FROM rostergroups AS rgs\
+                           JOIN rostergroupitems AS rgi ON rgi.groupid = rgs.groupid\
+                           JOIN jids ON rgs.userid = jids.id\
+                       WHERE jids.jid = ?", (jid,))
             
             for row in c:
                 roster.addGroup(row['contactid'], row['name'])
@@ -142,6 +142,254 @@ class IQRosterGetHandler(ThreadedHandler):
         return FunctionCall(checkFunc), FunctionCall(initFunc)
             
     
+    def resume(self):
+        # this is passed to the next handler
+        return self.retVal
+    
+class IQRosterUpdateHandler(ThreadedHandler):
+    """Responds to a roster iq set request"""
+    def __init__(self):
+        # this is true when the threaded handler returns
+        self.done = False
+        # used to pass the output to the next handler
+        self.retVal = None
+        
+    def handle(self, tree, msg, lastRetVal=None):
+        self.done = False
+        
+        tpool = msg.conn.server.threadpool
+        
+        # the actual function executing in the thread
+        def act():
+            # TODO: verify that it's coming from a known user
+            jid = msg.conn.data['user']['jid']
+            resource = msg.conn.data['user']['resource']
+            id = tree[0].get('id')
+            if id is None:
+                logging.warning('[roster] No id in roster get query. Tree: %s', tree[0])
+                # TODO: throw exception here
+                return
+            
+            # RFC 3921 says in section 7.4 "an item", so we only handle the
+            # first <item>
+            item = tree[0][0][0] # iq -> query -> item
+            cjid = item.get('jid')
+            name = item.get('name')
+            if cjid is None:
+                logging.warning("[roster] Client trying to add a roster item " + \
+                                "without a jid. Tree: %s", tree[0])
+                # TODO: throw exception here
+                return
+            
+            groups = list(item.findall('{jabber:iq:roster}group'))
+            
+            c = DB().cursor()
+            
+            # get our own id
+            c.execute("SELECT id FROM jids WHERE jid = ?", (jid,))
+            res = c.fetchone()
+            if res is None:
+                # TODO: throw exception here
+                return
+            
+            uid = res[0]
+            
+            # check if this is an update to an existing roster entry
+            c.execute("SELECT cjids.id cid \
+                       FROM roster\
+                       JOIN jids AS cjids ON cjids.id = roster.contactid\
+                       JOIN jids AS ujids ON ujids.id = roster.userid\
+                       WHERE ujids.jid = ? AND cjids.jid = ?", (jid, cjid))
+            res = c.fetchone()
+            if res:
+                # this is an update
+                # we don't update the subscription as it's the job of <presence>
+                cid = res[0]
+                c.execute("UPDATE roster SET name = ? WHERE contactid = ?",
+                          (name or '', cid))
+            else:
+                # this is a new roster entry
+                
+                # check if the contact JID already exists in our DB
+                c.execute("SELECT id FROM jids WHERE jid = ?", (cjid,))
+                res = c.fetchone()
+                if res:
+                    cid = res[0]
+                else:
+                    # create new JID entry
+                    res = c.execute("INSERT INTO jids\
+                                     (jid, password)\
+                                     VALUES\
+                                     (?, '')", (cjid,))
+                    cid = res.lastrowid
+                    
+                c.execute("INSERT INTO roster\
+                           (userid, contactid, name, subscription)\
+                           VALUES\
+                           (?, ?, ?, ?)", (uid, cid, name or '', 0))
+                    
+                    
+            # UPDATE GROUPS
+            # remove all group mappings for this contact and recreate
+            # them, since it's easier than figuring out what changed
+            c.execute("DELETE FROM rostergroupitems\
+                       WHERE contactid = ? AND groupid IN\
+                       (SELECT groupid FROM rostergroups WHERE\
+                           userid = ?)", (cid, uid))
+            for groupName in groups:
+                # get the group id
+                c.execute("SELECT groupid\
+                           FROM rostergroups\
+                           WHERE userid = ? AND name = ?", (uid, groupName.text))
+                res = c.fetchone()
+                if res:
+                    gid = res[0]
+                else:
+                    # need to create the group
+                    res = c.execute("INSERT INTO rostergroups\
+                                     (userid, name)\
+                                     VALUES\
+                                     (?, ?)", (uid, groupName.text))
+                    gid = res.lastrowid
+                
+                c.execute("INSERT INTO rostergroupitems\
+                           (groupid, contactid)\
+                           VALUES\
+                           (?, ?)", (gid, cid))
+                
+            # get the subscription status before roster push
+            c.execute("SELECT primaryname FROM substates\
+                       JOIN roster on roster.subscription = substates.stateid\
+                       WHERE roster.userid = ? AND roster.contactid = ?", (uid, cid))
+            res = c.fetchone()
+            if res is None:
+                sub = 'none'
+            else:
+                sub = res[0]
+            
+            # prepare the result for roster push
+            query = Element('query', {'xmlns' : 'jabber:iq:roster'})
+            
+            d = {
+                 'jid' : cjid,
+                 'subscription' : sub,
+                 }
+            if name:
+                d['name'] = name
+                
+            item = SubElement(query, 'item', d)
+            
+            for groupName in groups:
+                group = Element('group')
+                group.text = groupName.text
+                item.append(group)
+                
+            msg.setNextHandler('roster-push')
+                
+            return chainOutput(lastRetVal, query)
+        
+        def cb(workReq, retVal):
+            self.done = True
+            # make sure we pass the lastRetVal along
+            if retVal is None:
+                self.retVal = lastRetVal
+            else:
+                self.retVal = retVal
+                
+        req = threadpool.makeRequests(act, None, cb)
+        
+        def checkFunc():
+            # need to poll manually or the callback's never called from the pool
+            poll(tpool)
+            return self.done
+        
+        def initFunc():
+            tpool.putRequest(req[0])
+            
+        return FunctionCall(checkFunc), FunctionCall(initFunc)
+        
+    def resume(self):
+        # this is passed to the next handler
+        return self.retVal
+    
+class RosterPushHandler(ThreadedHandler):
+    """Uses the last return value from the previous handler to push a roster
+    change to all connected resources of the user. This handler needs to be
+    scheduled from another handler and passed an Element tree of the updated
+    roster to send with <query> as the initial element.
+    """
+    def __init__(self):
+        # this is true when the threaded handler returns
+        self.done = False
+        # used to pass the output to the next handler
+        self.retVal = None
+        
+    def handle(self, tree, msg, lastRetVal=None):
+        self.done = False
+        
+        tpool = msg.conn.server.threadpool
+        
+        def act():
+            # we have to be passed a tree to work
+            if not isinstance(lastRetVal, list) \
+                or not isinstance(lastRetVal[-1], Element) \
+                or lastRetVal[-1].tag.find('query') == -1:
+                logging.warning('[%s] Got a non-query Element last return value' +\
+                                '. Last return value: %s',
+                                self.__class__, lastRetVal)
+                return
+            
+            id = tree[0].get('id')
+            if not id:
+                logging.warning('[%s] No id in roster get query. Tree: %s',
+                                self.__class__, tree[0])
+                return
+            
+            jid = msg.conn.data['user']['jid']
+            resource = msg.conn.data['user']['resource']
+            
+            # replace the <query> in lastRetVal with an ack to client
+            query = lastRetVal.pop(-1)
+            
+            resources = msg.conn.server.data['resources'][jid]
+            for res, con in resources.items():
+                iq = Element('iq', {
+                                    'to' : '%s/%s' % (jid, res),
+                                    'type' : 'set',
+                                    'id' : generateId()[:10]
+                                    })
+                iq.append(query)
+                
+                con.send(tostring(iq))
+                
+            # send an ack to client
+            iq = Element('iq', {
+                                'to' : '%s/%s' % (jid, resource),
+                                'type' : 'result',
+                                'id' : id
+                                })
+            return chainOutput(lastRetVal, iq)
+        
+        def cb(workReq, retVal):
+            self.done = True
+            # make sure we pass the lastRetVal along
+            if retVal is None:
+                self.retVal = lastRetVal
+            else:
+                self.retVal = retVal
+                
+        req = threadpool.makeRequests(act, None, cb)
+        
+        def checkFunc():
+            # need to poll manually or the callback's never called from the pool
+            poll(tpool)
+            return self.done
+        
+        def initFunc():
+            tpool.putRequest(req[0])
+            
+        return FunctionCall(checkFunc), FunctionCall(initFunc)
+        
     def resume(self):
         # this is passed to the next handler
         return self.retVal
