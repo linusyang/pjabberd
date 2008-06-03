@@ -68,7 +68,17 @@ corePhases = PrioritizedDict(_corePhases)
 _c2sStanzaPhases = {
     'default' : {
                  'description' : 'default phase for when no other matches'
-                 }, 
+                 },
+    'iq-auth-get' : {
+                     'description' : 'responds to iq-auth get',
+                     'xpath' : "{jabber:client}iq[@type='get']/{jabber:iq:auth}query",
+                     'handlers' : [h['iq-auth-get'], h['write']]
+                     },
+    'iq-auth-set' : {
+                     'description' : 'responds to iq-auth set',
+                     'xpath' : "{jabber:client}iq[@type='set']/{jabber:iq:auth}query",
+                     'handlers' : [h['iq-auth-set'], h['write']]
+                     },
     'iq-bind' : {
                  'description' : 'client binding a resource', 
                  'xpath' : "{jabber:client}iq[@type='set']/{urn:ietf:params:xml:ns:xmpp-bind}bind", 

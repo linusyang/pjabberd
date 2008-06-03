@@ -180,6 +180,18 @@ class Message:
                 eHandler = Dispatcher().getHandlerFunc(errorHandlerName)
                 if eHandler:
                     self.errorHandlers.insert(0, eHandler())
+                    
+    def queueHandler(self, handlerName, errorHandlerName=None):
+        """Schedules 'handlerName' as the last handler to execute. Optionally,
+        also schedules 'errorHandlerName' as the last error handler.
+        """
+        handler = Dispatcher().getHandlerFunc(handlerName)
+        if handler:
+            self.handlers.append(handler())
+            if errorHandlerName:
+                eHandler = Dispatcher().getHandlerFunc(errorHandlerName)
+                if eHandler:
+                    self.errorHandlers.append(eHandler())
 
 # Variables that the dispatchers share
 

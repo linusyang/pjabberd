@@ -8,6 +8,23 @@ from pjs.utils import tostring, generateId, FunctionCall
 from pjs.db import DB
 from copy import deepcopy
 
+def bindResource(msg, resource):
+    """Records the resource binding. Returns the bare JID."""
+    msg.conn.data['user']['resource'] = resource
+            
+    # record the resource in the JID object of the (JID, Connection) pair
+    # this is for local delivery lookups
+    msg.conn.server.conns[msg.conn.id][0].resource = resource
+    
+    jid = msg.conn.data['user']['jid']
+    
+    # save the jid/resource in the server's global storage
+    msg.conn.server.data['resources'][jid] = {
+                                              resource : msg.conn
+                                              }
+    
+    return jid
+
 class IQBindHandler(Handler):
     """Handles resource binding"""
     def handle(self, tree, msg, lastRetVal=None):
@@ -24,19 +41,7 @@ class IQBindHandler(Handler):
                 resource = generateId()[:6]
             
             # TODO: check that we don't already have such a resource
-            
-            msg.conn.data['user']['resource'] = resource
-            
-            # record the resource in the JID object of the (JID, Connection) pair
-            # this is for local delivery lookups
-            msg.conn.server.conns[msg.conn.id][0].resource = resource
-            
-            jid = msg.conn.data['user']['jid']
-            
-            # save the jid/resource in the server's global storage
-            msg.conn.server.data['resources'][jid] = {
-                                                      resource : msg.conn
-                                                      }
+            jid = bindResource(msg, resource)
                 
             res = Element('iq', {'type' : 'result', 'id' : id})
             bind = Element('bind', {'xmlns' : 'urn:ietf:params:xml:ns:xmpp-bind'})

@@ -4,7 +4,7 @@ import pjs.handlers.write
 import pjs.handlers.simple
 import pjs.handlers.stream
 import pjs.handlers.iq
-import pjs.handlers.sasl
+import pjs.handlers.auth
 import pjs.handlers.presence
 import pjs.handlers.route
 
@@ -52,15 +52,15 @@ handlers = {
                                     'description' : 'returns a iq-not-implemented error'
                                     },
             'sasl-auth' : {
-                           'handler' : pjs.handlers.sasl.SASLAuthHandler,
+                           'handler' : pjs.handlers.auth.SASLAuthHandler,
                            'description' : 'incoming SASL auth handler'
                            },
             'sasl-response' : {
-                               'handler' : pjs.handlers.sasl.SASLResponseHandler,
+                               'handler' : pjs.handlers.auth.SASLResponseHandler,
                                'description' : 'incoming SASL challenge response handler'
                                },
             'sasl-error' : {
-                            'handler' : pjs.handlers.sasl.SASLErrorHandler,
+                            'handler' : pjs.handlers.auth.SASLErrorHandler,
                             'description' : 'handles SASLErrors and responds with '+\
                                             'appropriate failure element'
                             },
@@ -84,6 +84,14 @@ handlers = {
                              'handler' : pjs.handlers.iq.RosterPushHandler,
                              'description' : 'uses the last return value to push ' +\
                                              'the roster change to all connected resources'
+                             },
+            'iq-auth-get' : {
+                             'handler' : pjs.handlers.auth.IQAuthGetHandler,
+                             'description' : 'responds to the iq auth get query'
+                             },
+            'iq-auth-set' : {
+                             'handler' : pjs.handlers.auth.IQAuthSetHandler,
+                             'description' : 'responds to the iq auth set query'
                              },
             'c2s-presence' : {
                               'handler' : pjs.handlers.presence.C2SPresenceHandler,

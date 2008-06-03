@@ -100,6 +100,11 @@ class FeaturesAuthHandler(Handler):
         SubElement(mechs, 'mechanism').text = 'DIGEST-MD5'
         SubElement(mechs, 'mechanism').text = 'PLAIN'
         
+        # we also support the old style jabber:iq:auth
+        SubElement(res, 'auth', {
+                    'xmlns' : 'http://jabber.org/features/iq-auth'
+                    })
+        
         return chainOutput(lastRetVal, res)
         
 # we don't have TLS for now

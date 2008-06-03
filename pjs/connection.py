@@ -27,7 +27,13 @@ class Connection(asyncore.dispatcher_with_send):
                              'mech' : 'DIGEST-MD5', # or PLAIN
                              'mechObj' : None, # <reference to one of SASL mech objects>
                              'complete' : False,
+                             'in-progress' : False,
                              }
+        self.data['iqauth'] = {
+                               'mech' : 'digest', # or plain
+                               'in-progress' : False,
+                               'complete' : False,
+                               }
         self.data['tls'] = {
                             'enabled' : False,
                             'complete' : False,

@@ -9,10 +9,11 @@ from pjs.jid import JID
 
 try:
     # python >= 2.5
-    from hashlib import md5
+    from hashlib import md5, sha1
 except ImportError:
     from md5 import new as md5
-
+    from sha import new as sha1
+    
 try:
     # Python >= 2.4
     from base64 import b64decode, b64encode
@@ -66,8 +67,8 @@ def KD(k, s):
     """
     return H('%s:%s' % (k, s))
 
-class Plain:
-    """Implements the PLAIN authentication mechanism"""
+class SASLPlain:
+    """Implements the SASL PLAIN authentication mechanism"""
     def __init__(self, msg):
         self.msg = msg
         
@@ -91,10 +92,12 @@ class Plain:
                                             '@' + self.msg.conn.server.hostname, auth[2]))
             res = c.fetchall()
             if len(res) == 0:
+                c.close()
                 raise SASLAuthError
             c.close()
         
         self.msg.conn.data['sasl']['complete'] = True
+        self.msg.conn.data['sasl']['in-progress'] = False
         self.msg.conn.data['user'] = {
                                  'jid' : '%s@%s' % (auth[1], self.msg.conn.server.hostname),
                                  'resource' : '',
@@ -110,8 +113,8 @@ class Plain:
         return Element('success',
                        {'xmlns' : 'urn:ietf:params:xml:ns:xmpp-sasl'})
 
-class DigestMD5:
-    """Implements the DIGEST-MD5 authentication mechanism. Stores state
+class SASLDigestMD5:
+    """Implements the SASL's DIGEST-MD5 authentication mechanism. Stores state
     of the authentication, so should be saved between requests.
     """
     
@@ -125,19 +128,21 @@ class DigestMD5:
     
     
     def __init__(self, msg):
+        """
+        msg -- the Message object. This has to be passed in, because this object
+                may be shared between Message instances
+        """
         self.nonce = None
         self.nc = 0x0
         self.realm = msg.conn.server.hostname
         self.msg = msg
         self.username = None
         self.failures = 0
-        self.state = DigestMD5.INIT
+        self.state = SASLDigestMD5.INIT
     
-    def handle(self, msg, data=None):
+    def handle(self, data=None):
         """Performs DIGEST-MD5 auth based on current state.
         
-        msg -- the Message object. This has to be passed in, because this object
-                may be shared between Message instances
         data -- either None for initial challenge, base64-encoded text when
                 the client responds to challenge 1, or the tree when the client
                 responds to challenge 2.
@@ -150,9 +155,9 @@ class DigestMD5:
         charset = 'charset=utf-8'
         algo = 'algorithm=md5-sess'
         
-        if self.state == DigestMD5.INIT: # initial challenge
+        if self.state == SASLDigestMD5.INIT: # initial challenge
             self.nonce = generateId()
-            self.state = DigestMD5.SENT_CHALLENGE1
+            self.state = SASLDigestMD5.SENT_CHALLENGE1
             
             nonce = 'nonce="%s"' % self.nonce
             realm = 'realm="%s"' % self.realm
@@ -162,7 +167,7 @@ class DigestMD5:
             res.text = base64.b64encode(','.join([realm, qop, nonce, charset, algo]))
             
             return res
-        elif self.state == DigestMD5.SENT_CHALLENGE1 and data:
+        elif self.state == SASLDigestMD5.SENT_CHALLENGE1 and data:
             # response to client's reponse (ie. challenge 2)
             try:
                 text = fromBase64(data)
@@ -195,12 +200,13 @@ class DigestMD5:
             # fetch the password now
             c = DB().cursor()
             c.execute("SELECT password FROM jids WHERE \
-                jid = ?", (username + '@%s' % msg.conn.server.hostname,))
+                jid = ?", (username + '@%s' % self.msg.conn.server.hostname,))
             for row in c:
                 password = row['password']
                 break
             else:
                 self._handleFailure()
+                c.close()
                 raise SASLAuthError
             c.close()
             
@@ -221,7 +227,7 @@ class DigestMD5:
                                                        cnonce, "auth",
                                                        HEX(H(a2)))))
                 
-                self.state = DigestMD5.SENT_CHALLENGE2
+                self.state = SASLDigestMD5.SENT_CHALLENGE2
                 
                 res = Element('challenge',
                               {'xmlns' : 'urn:ietf:params:xml:ns:xmpp-sasl'})
@@ -232,23 +238,26 @@ class DigestMD5:
             else:
                 self._handleFailure()
                 raise SASLAuthError
-        elif self.state == DigestMD5.SENT_CHALLENGE2 and isinstance(data, Element):
+        elif self.state == SASLDigestMD5.SENT_CHALLENGE2 and isinstance(data, Element):
             # expect to get <response xmlns='urn:ietf:params:xml:ns:xmpp-sasl'/>
             respInd = data.tag.find('{urn:ietf:params:xml:ns:xmpp-sasl}response')
+            d = self.msg.conn.data
             if respInd != -1 and len(data) == 0:
-                self.state = DigestMD5.INIT
-                msg.conn.data['sasl']['complete'] = True
-                msg.conn.data['user'] = {
-                                         'jid' : '%s@%s' % (self.username, msg.conn.server.hostname),
-                                         'resource' : '',
-                                         'in-session' : False
-                                         }
+                self.state = SASLDigestMD5.INIT
+                d['sasl']['complete'] = True
+                d['sasl']['in-progress'] = False
+                d['user'] = {
+                             'jid' : '%s@%s' % (self.username,
+                                            self.msg.conn.server.hostname),
+                             'resource' : '',
+                             'in-session' : False
+                             }
                 
                 # record the JID for local delivery
-                self.msg.conn.server.conns[self.msg.conn.id] = (JID(self.msg.conn.data['user']['jid']),
+                self.msg.conn.server.conns[self.msg.conn.id] = (JID(d['user']['jid']),
                                                                 self.msg.conn)
                 
-                msg.conn.parser.resetParser()
+                self.msg.conn.parser.resetParser()
                 
                 res = Element('success',
                               {'xmlns' : 'urn:ietf:params:xml:ns:xmpp-sasl'})
@@ -263,7 +272,7 @@ class DigestMD5:
     
     def _parse(self, challenge):
         """Parses the client's response to our challenge 1.
-        This code is a modified version of twisted's sasl_mechanisms.py.
+        This code is a modified version of twisted's auth_mechanisms.py.
         See TWISTED-LICENSE.
         """
         s = challenge
@@ -307,9 +316,81 @@ class DigestMD5:
     
     def _handleFailure(self):
         self.failures += 1
-        if (self.failures > DigestMD5.MAX_FAILURES):
+        if (self.failures > SASLDigestMD5.MAX_FAILURES):
             self.failures = 0
-            self.state = DigestMD5.INIT
+            self.state = SASLDigestMD5.INIT
+
+class IQAuthPlain:
+    """Handles the old-style jabber:iq:auth plaintext auth"""
+    def __init__(self, msg):
+        self.msg = msg
+        
+    def handle(self, username, password):
+        c = DB().cursor()
+        c.execute("SELECT password FROM jids WHERE \
+            jid = ?", (username + '@%s' % self.msg.conn.server.hostname,))
+        res = c.fetchone()
+        if res:
+            password = res[0]
+        else:
+            c.close()
+            raise IQAuthError
+        c.close()
+        
+        d = self.msg.conn.data
+        d['user'] = {
+                         'jid' : '%s@%s' % (username,
+                                           self.msg.conn.server.hostname),
+                         'resource' : '',
+                         'in-session' : False
+                         }
+        # record the JID for local delivery
+        self.msg.conn.server.conns[self.msg.conn.id] = (JID(d['user']['jid']),
+                                                        self.msg.conn)
+        
+        self.msg.conn.parser.resetParser()
+
+class IQAuthDigest:
+    """Handles the old-style jabber:iq:auth digest auth"""
+    def __init__(self, msg):
+        self.msg = msg
+        self.streamid = msg.conn.data['stream']['id']
+    def handle(self, username, digest):
+        c = DB().cursor()
+        c.execute("SELECT password FROM jids WHERE \
+            jid = ?", (username + '@%s' % self.msg.conn.server.hostname,))
+        res = c.fetchone()
+        if res:
+            password = res[0]
+        else:
+            c.close()
+            raise IQAuthError
+        c.close()
+        
+        s = sha1()
+        s.update(self.streamid + password)
+        hashtext = s.hexdigest()
+        
+        if hashtext == digest:
+            d = self.msg.conn.data
+            d['user'] = {
+                         'jid' : '%s@%s' % (username,
+                                           self.msg.conn.server.hostname),
+                         'resource' : '',
+                         'in-session' : False
+                         }
+            
+            # record the JID for local delivery
+            self.msg.conn.server.conns[self.msg.conn.id] = (JID(d['user']['jid']),
+                                                            self.msg.conn)
+            
+            self.msg.conn.parser.resetParser()
+            return
+        else:
+            raise IQAuthError
+
+class IQAuthError(Exception):
+    pass
 
 class SASLError(Exception):
     def errorElement(self):
