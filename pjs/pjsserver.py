@@ -100,6 +100,7 @@ if __name__ == '__main__':
         c.execute("INSERT INTO jids (jid, password) VALUES ('tro@localhost', 'test')")
         c.execute("INSERT INTO jids (jid, password) VALUES ('dv@localhost', 'test')")
         c.execute("INSERT INTO jids (jid, password) VALUES ('bob@localhost', 'test')")
+        c.execute("INSERT INTO jids (jid, password) VALUES ('alice@localhost', 'test')")
         con.commit()
 #        c.execute("INSERT INTO roster (userid, contactid, subscription) VALUES (1, 2, 8)")
 #        c.execute("INSERT INTO roster (userid, contactid, subscription) VALUES (2, 1, 8)")
