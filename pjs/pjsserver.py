@@ -3,7 +3,6 @@ import logging
 import os, os.path, sys
 
 from pjs.db import DB, sqlite
-from pjs.router import Router
 
 class PJSLauncher:
     """The one and only instance of the server. This controls all other
@@ -17,7 +16,7 @@ class PJSLauncher:
         
         self.hostname = 'localhost'
         
-        self.router, self._c2s, self._s2s = (None, None, None)
+        self._c2s, self._s2s = (None, None)
         
     def run(self):
         from pjs.server import C2SServer, S2SServer
@@ -37,8 +36,6 @@ class PJSLauncher:
             
         self._c2s.createThreadpool(5, notifyFunc)
         self._s2s.createThreadpool(5, notifyFunc)
-        
-        self.router = Router(self)
         
     def getC2SServer(self):
         return self._c2s

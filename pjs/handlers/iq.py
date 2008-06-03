@@ -182,11 +182,9 @@ class IQRosterUpdateHandler(ThreadedHandler):
                 resources = msg.conn.server.launcher.getC2SServer().data['resources']
                 jidForResources = resources.has_key(jid) and resources[jid]
                 if jidForResources:
-                    #logging.debug("!!! jidForResources: %d", len(jidForResources))
                     for i in jidForResources:
                         out += "<presence from='%s/%s'" % (jid, i)
                         out += " to='%s' type='unavailable'/>" % cjid
-                    #logging.debug("!!! About to route %s", out)
                     
                 # prepare routing data
                 d = {

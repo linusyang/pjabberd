@@ -61,7 +61,6 @@ class ClientRouteHandler(Handler):
                 return jidConn[0].node == jid.node and jidConn[0].domain == jid.domain
             
         activeJids = filter(f, conns)
-        logging.debug("activeJids: %s", activeJids)
         for con in activeJids:
             if callable(preprocessFunc):
                 conns[con][1].send(prepareDataForSending(preprocessFunc(data, conns[con][1])))

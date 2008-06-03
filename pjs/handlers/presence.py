@@ -350,11 +350,9 @@ class S2SSubscriptionHandler(ThreadedHandler):
                         jidForResources = resources.has_key(bareJID) and resources[bareJID]
                         if jidForResources:
                             out = u''
-                            #logging.debug("!!! jidForResources: %d", len(jidForResources))
                             for i in jidForResources:
                                 out += "<presence from='%s/%s'" % (bareJID, i)
                                 out += " to='%s' type='unavailable'/>" % cjid.getBare()
-                            #logging.debug("!!! About to route %s", out)
                             # and route it
                             unavailableRouting = {
                                                   'to' : cjid,
@@ -606,11 +604,9 @@ class C2SSubscriptionHandler(ThreadedHandler):
                         jidForResources = resources.has_key(jid) and resources[jid]
                         if jidForResources:
                             out = u''
-                            logging.debug("!!! jidForResources: %d", len(jidForResources))
                             for i in jidForResources:
                                 out += "<presence from='%s/%s'" % (jid, i)
                                 out += " to='%s'/>" % cjid.getBare()
-                            logging.debug("!!! About to route %s", out)
                             # and queue for routing
                             toRoute += out
                         
@@ -732,11 +728,9 @@ class C2SSubscriptionHandler(ThreadedHandler):
                         jidForResources = resources.has_key(jid) and resources[jid]
                         if jidForResources:
                             out = u''
-                            #logging.debug("!!! jidForResources: %d", len(jidForResources))
                             for i in jidForResources:
                                 out += "<presence from='%s/%s'" % (jid, i)
                                 out += " to='%s' type='unavailable'/>" % cjid.getBare()
-                            #logging.debug("!!! About to route %s", out)
                             # and add to output
                             toRoute += out
                         
