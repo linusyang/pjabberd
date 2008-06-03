@@ -1,7 +1,9 @@
 import unittest
 import copy
 import xml.parsers.expat
+import pjs.conf.handlers as handlers
 from pjs.parsers import IncrStreamParser
+from pjs.handlers.base import Handler
 
 streamStart = """<stream:stream xmlns='jabber:client' \
             xmlns:stream='http://etherx.jabber.org/streams' \
@@ -72,10 +74,25 @@ class TestDumbParser(unittest.TestCase):
         
 class TestParser(unittest.TestCase):
     """Test tree-building of the incremental parser"""
+
+    # these are tested in some cases
+    stream = None
+    tree = None
     
     def setUp(self):
         unittest.TestCase.setUp(self)
         self.p = IncrStreamParser()
+        self.oldhandlers = copy.deepcopy(handlers.handlers)
+        
+        def saveData(tree, msg, lastRetVal):
+            TestParser.stream = copy.deepcopy(self.p.stream)
+            TestParser.tree = copy.deepcopy(tree)
+        
+        class StreamEndHandler(Handler):
+            def handle(self, tree, msg, lastRetVal=None):
+                saveData(tree, msg, lastRetVal)
+        
+        handlers.handlers['stream-end']['handler'] = StreamEndHandler
         
     def tearDown(self):
         unittest.TestCase.tearDown(self)
@@ -84,6 +101,8 @@ class TestParser(unittest.TestCase):
             self.p.close() 
         except xml.parsers.expat.ExpatError:
             pass
+        
+        handlers.handlers = self.oldhandlers
         
     def testOpenStream(self):
         """Depth should increase at stream element"""
@@ -105,7 +124,7 @@ class TestParser(unittest.TestCase):
         self.p.feed(streamStart)
         self.p.feed(streamEnd)
         
-        self.assert_(self.p.stream is not None)
+        self.assert_(TestParser.stream is not None)
         
     def testSimpleStanza(self):
         """Single-level empty stanza"""
@@ -120,18 +139,6 @@ class TestParser(unittest.TestCase):
         # copying for our own use
         self.assert_(self.p.tree.tag == '{http://etherx.jabber.org/streams}features')
         self.assert_(self.p.depth == 1)
-        
-    def testSimpleStanzaKeepTree(self):
-        """Single-level empty stanza. Should keep self.p.tree after stanza is
-        fully parsed, since we may refer to the tree after the closing element
-        is handled.
-        """
-        self.p.feed(streamStart)
-        self.p.feed('<stream:features>')
-        self.p.feed('</stream:features>')
-        self.p.feed(streamEnd)
-        
-        self.assert_(self.p.tree is not None)
         
     def testDeepStanza(self):
         """Multi-level stanza"""
@@ -154,8 +161,8 @@ class TestParser(unittest.TestCase):
         self.p.feed('<stream:features></stream:features>')
         self.p.feed(streamEnd)
         
-        stream = copy.copy(self.p.stream)
-        stream.insert(0, self.p.tree)
+        stream = copy.deepcopy(TestParser.stream)
+        stream.insert(0, TestParser.tree)
         
         self.assert_(stream.find('{http://etherx.jabber.org/streams}features') is not None)
         

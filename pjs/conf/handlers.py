@@ -25,6 +25,10 @@ handlers = {
                                'handler' : pjs.handlers.stream.StreamReInitHandler,
                                'description' : 'reinitializes the stream'
                                },
+            'stream-end' : {
+                            'handler' : pjs.handlers.stream.StreamEndHandler,
+                            'description' : 'cleans up when the stream is ended by the other side'
+                            },
             'features-init' : {
                                'handler' : pjs.handlers.stream.FeaturesInitHandler,
                                'description' : 'sends out initial features'

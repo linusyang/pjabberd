@@ -19,6 +19,10 @@ corePhases = {
                              'description' : 'new stream where one already exists',
                              'handlers' : [h['stream-reinit']]
                              },
+          'stream-end' : {
+                          'description' : 'stream ended by the other side',
+                          'handlers' : [h['stream-end']]
+                          },
           'features' : {
                         'description' : 'stream features such as TLS and resource binding',
                         'xpath' : '{http://etherx.jabber.org/streams}features',

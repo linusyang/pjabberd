@@ -113,6 +113,7 @@ class IncrStreamParser:
         assert(self.depth >= 0)
         
         if self.depth == 0:
+            Dispatcher().dispatch(self.tree, self.conn, 'stream-end')
             self.resetStream()
             self.resetParser()
         elif self.depth == 1:

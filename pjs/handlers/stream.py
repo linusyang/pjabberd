@@ -93,10 +93,8 @@ class FeaturesPostAuthHandler(Handler):
                 
         msg.addTextOutput(res)
 
-class StreamCloseHandler(Handler):
+class StreamEndHandler(Handler):
     """Handler for closing the stream"""
-    def __init__(self):
-        pass
-    
+
     def handle(self, tree, msg, lastRetVal=None):
         msg.conn.data['stream']['in-stream'] = False
