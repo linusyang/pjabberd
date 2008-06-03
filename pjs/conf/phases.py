@@ -43,7 +43,7 @@ phases = {
           'iq' : {
                   'description' : 'incoming IQ stanza',
                   'xpath' : '{jabber:client}iq',
-                  'handlers' : [h['iq-not-implemented']]
+                  'handlers' : [h['iq-not-implemented'], h['write']]
                   },
           'message' : {
                        'description' : 'incoming message stanza',

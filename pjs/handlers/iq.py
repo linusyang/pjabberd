@@ -1,5 +1,6 @@
 from pjs.handlers.base import Handler
-from pjs.elementtree.ElementTree import Element, SubElement, tostring
+from pjs.elementtree.ElementTree import Element, SubElement
+from pjs.utils import tostring
 
 class IQNotImplementedHandler(Handler):
     """Handler that replies to unknown iq stanzas"""

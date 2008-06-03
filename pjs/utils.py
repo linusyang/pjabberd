@@ -5,7 +5,10 @@ try:
 except ImportError:
     from sha import new as sha1
     
-import time, os
+import time, os, re
+
+standardNSre = re.compile(r'^{jabber:(client|server)}', re.UNICODE)
+customNSre = re.compile(r'^{(.*?)}(.*)')
 
 # This is used in pjs.async.asyncore.
 class FunctionCall:
@@ -35,3 +38,33 @@ class FunctionCall:
 
 def generateId():
     return sha1(str((random(), time.gmtime(), os.getpid()))).hexdigest()
+
+def tostring(tree):
+    def processTree(tree):
+        res, tag = decurl(tree.tag)
+        res = u'<' + res
+        for k,v in tree.items():
+            res += " %s='%s'" % (k,v)
+        if len(tree) > 0:
+            res += '>'
+            for i in tree:
+                res += processTree(i)
+            res += '</%s>' % tag
+        else:
+            res += '/>'
+            
+        return res
+        
+    res = u''
+    res += processTree(tree)
+    return res
+
+def decurl(tagName):
+    res = standardNSre.sub('', tagName)
+    res = customNSre.sub(r"\2 xmlns='\1'", res)
+    end = res.find(' ')
+    if end == -1:
+        tag = res
+    else:
+        tag = res[:end]
+    return res, tag

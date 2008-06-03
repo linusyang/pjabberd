@@ -3,7 +3,7 @@
 from xml.parsers import expat
 from pjs.events import Dispatcher
 import pjs.elementtree.ElementTree as et
-from copy import copy
+from copy import deepcopy
 
 def borrow_parser(conn):
     """Borrow a parser from a pool of parsers"""
@@ -110,8 +110,8 @@ class IncrStreamParser:
         assert(self.depth >= 0)
         
         if self.depth == 0:
-            # handle </stream>. don't reset because we may need the data
-            pass
+            self.resetStream()
+            self.resetParser()
         elif self.depth == 1:
             # handle </stanza>
             assert(self.tree)
@@ -121,7 +121,7 @@ class IncrStreamParser:
             
             # pass the el to the dispatcher for processing having wrapped it
             # in the <stream> element first
-            tree = copy(self.stream)
+            tree = deepcopy(self.stream)
             tree.append(self.tree)
             Dispatcher().dispatch(tree, self.conn)
         else:
