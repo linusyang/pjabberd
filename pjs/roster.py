@@ -14,11 +14,8 @@ class Roster:
         c.execute("SELECT id FROM jids WHERE jid = ?", (self.jid,))
         res = c.fetchone()
         if res is None:
-            c.close()
             raise Exception, "No record of this JID in the DB"
         
-        c.close()
-        con.close()
         self.uid = res[0]
         
     def addItem(self, contactId, rosterItem):
@@ -54,10 +51,7 @@ class Roster:
             sub = res[2]
         else:
             c.close()
-            con.close()
             return False
-        
-        c.close()
         
         if includeGroups:
             # get the groups
@@ -67,12 +61,8 @@ class Roster:
                        WHERE rgs.userid = ? AND rgi.contactid = ?", (self.uid, cid))
             groups = [group['name'] for group in c]
             
-            c.close()
-            con.close()
-            
             return RosterItem(cjid, name, sub, groups, cid)
         else:
-            con.close()
             
             return RosterItem(cjid, name, sub, id=cid)
     
@@ -163,7 +153,6 @@ class Roster:
                        (?, ?)", (gid, cid))
         
         commitSQLiteTransaction(con, c)
-        con.close()
             
         return cid
     
@@ -202,7 +191,6 @@ class Roster:
                    WHERE userid = ? AND contactid = ?", (self.uid, cid))
         
         commitSQLiteTransaction(con, c)
-        con.close()
         
         return cid
         
@@ -216,12 +204,8 @@ class Roster:
         if res:
             sub = res[0]
             
-            c.close()
-            con.close()
             return sub
         else:
-            c.close()
-            con.close()
             raise Exception, "No such contact in roster"
     
     def setSubscription(self, cid, sub):
@@ -234,7 +218,6 @@ class Roster:
         c.execute("UPDATE roster SET subscription = ?\
                    WHERE userid = ? AND contactid = ?", (sub, self.uid, cid))
         commitSQLiteTransaction(con, c)
-        con.close()
     
     def getSubPrimaryName(self, cid):
         """Gets the primary name of a subscription for this user and this
@@ -251,9 +234,6 @@ class Roster:
         else:
             sub = Subscription.getPrimaryNameFromState(res[0])
             
-        c.close()
-        con.close()
-        
         return sub
     
     def getPresenceSubscribers(self):
@@ -274,9 +254,6 @@ class Roster:
         for row in res:
             jids.append(row[0])
             
-        c.close()
-        con.close()
-        
         return jids
     
     def getPresenceSubscriptions(self):
@@ -297,9 +274,6 @@ class Roster:
         for row in res:
             jids.append(row[0])
             
-        c.close()
-        con.close()
-        
         return jids
     
     def loadRoster(self):
@@ -335,7 +309,6 @@ class Roster:
             self.addGroup(row['contactid'], row['name'])
             
         commitSQLiteTransaction(con, c)
-        con.close()
     
     def getAsTree(self):
         """Returns the roster Element tree starting from <query>. Call
