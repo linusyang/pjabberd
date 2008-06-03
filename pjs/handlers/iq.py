@@ -64,7 +64,7 @@ class IQNotImplementedHandler(Handler):
             res.append(origIQ)
             
             err = Element('error', {'type' : 'cancel'})
-            SubElement(err, 'feature-not-implemented',
+            SubElement(err, 'service-unavailable',
                        {'xmlns' : 'urn:ietf:params:xml:ns:xmpp-stanzas'})
             
             res.append(err)
