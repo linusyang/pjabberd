@@ -61,7 +61,7 @@ except NameError:
     socket_map = {}
     
 try:
-    func_map # tuple of (func, funcArgs={})
+    func_map # dictionary of FunctionCall => callback
 except NameError:
     func_map = {}
 
