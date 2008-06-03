@@ -185,12 +185,12 @@ class DigestMD5:
             c = DB().cursor()
             c.execute("SELECT password FROM users WHERE \
                 username = ?", (username,))
-            res = c.fetchall()
-            if len(res) == 0:
+            for row in c:
+                password = row['password']
+                break
+            else:
                 self._handleFailure()
                 raise SASLAuthError
-            else:
-                password = res[0][0]
             c.close()
             
             # compute the digest as per RFC 2831
