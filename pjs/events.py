@@ -139,11 +139,13 @@ class Message:
                     self._execThreadedHandler(errorHandler)
                     return True
                 else:
-                    logging.warning("Unknown error handler type (%s) for %s",
-                                    type(errorHandler), errorHandler)
+                    logging.warning("[%s] Unknown error handler type (%s) for %s",
+                                    self.__class__, type(errorHandler),
+                                    errorHandler)
             else:
-                logging.warning("No error handler assigned for %s. " +\
-                                "Last exception: %s", handler, self._lastRetVal)
+                logging.warning("[%s] No error handler assigned for %s. " +\
+                                "Last exception: %s",
+                                self.__class__, handler, self._lastRetVal)
                 
             self._updateRunningHandlers()
         else:
@@ -158,8 +160,8 @@ class Message:
                 self._execThreadedHandler(handler)
                 return True
             else:
-                logging.warning("Unknown handler type (%s) for %s",
-                                type(handler), handler)
+                logging.warning("[%s] Unknown handler type (%s) for %s",
+                                self.__class__, type(handler), handler)
                 
         return False
     
@@ -237,7 +239,7 @@ def pickupResults():
             else:
                 # message left on the queue for a connection that's no longer
                 # there, so we log it and move on
-                logging.warning("[events] Connection id %d has no corresponding" +\
+                logging.warning("[pickupResults] Connection id %d has no corresponding" +\
                                 " Connection object. Dropping result from queue.", connId)
             resultQ.task_done()
             del _runningMessages[connId]

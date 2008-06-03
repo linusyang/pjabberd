@@ -67,7 +67,8 @@ class IncrStreamParser:
         will be buffered.
         """
         if data != ' ':
-            logging.debug("[parser] For connection %s parser got: %s", self.conn.id, data)
+            logging.debug("[%s] For connection %s parser got: %s",
+                          self.__class__, self.conn.id, data)
         self._parser.Parse(data, 0)
 
     def close(self):

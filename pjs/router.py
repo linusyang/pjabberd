@@ -112,7 +112,8 @@ class Router:
                     return False
             else:
                 # can't extract routing information
-                logging.warning("[router] Can't extract routing information from %s", data)
+                logging.warning("[%s] Can't extract routing information from %s",
+                                self.__class__, data)
                 return False
             
         return to
@@ -125,6 +126,6 @@ class Router:
             try:
                 jid = JID(to)
             except Exception, e:
-                logging.warning(e)
+                logging.warning("[%s] " + e, self.__class__)
                 return False
         return jid

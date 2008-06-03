@@ -34,7 +34,8 @@ class Connection(asyncore.dispatcher_with_send):
                             }
         
     def handle_expt(self):
-        logging.warning("Socket exception occurred for %s", self.addr)
+        logging.warning("[%s] Socket exception occurred for %s",
+                        self.__class__, self.addr)
         self.handle_close()
     
     def handle_close(self):
@@ -72,14 +73,16 @@ class ClientConnection(Connection):
                                                         # updates
                              }
         
-        logging.info("New c2s connection accepted from %s", self.addr)
+        logging.info("[%s] New c2s connection accepted from %s",
+                     self.__class__, self.addr)
         
     def handle_close(self):
         # this resource is no longer connected
         jid = self.data['user']['jid']
         resource = self.data['user']['resource']
         
-        logging.debug("Closing ClientConnection with %s", jid)
+        logging.debug("[%s] Closing ClientConnection with %s",
+                      self.__class__, jid)
         
         if jid:
             del self.server.data['resources'][jid][resource]
@@ -98,7 +101,8 @@ class ServerConnection(Connection):
                                'hostname' : '',
                                }
         
-        logging.info("New s2s connection accepted from %s", self.addr)
+        logging.info("[%s] New s2s connection accepted from %s",
+                     self.__class__, self.addr)
         
 class ServerInConnection(ServerConnection):
     """An s2s connection to us from a remote server"""
@@ -112,7 +116,8 @@ class ServerInConnection(ServerConnection):
     def handle_close(self):
         hostname = self.data['server']['hostname']
         
-        logging.debug("Closing ServerInConnection with %s", hostname)
+        logging.debug("[%s] Closing ServerInConnection with %s",
+                      self.__class__, hostname)
         
         if hostname:
             self.server.s2sConns[hostname][0] = None
@@ -135,7 +140,8 @@ class ServerOutConnection(ServerConnection):
     def handle_close(self):
         hostname = self.data['server']['hostname']
         
-        logging.debug("Closing ServerOutConnection with %s", hostname)
+        logging.debug("[%s] Closing ServerOutConnection with %s",
+                      self.__class__, hostname)
         
         if hostname:
             self.server.s2sConns[hostname][1] = None
@@ -161,10 +167,12 @@ class LocalTriggerConnection(asyncore.dispatcher_with_send):
         self.create_socket(socket.AF_INET, socket.SOCK_STREAM)
         self.connect((ip, port))
         
-        logging.info("New local trigger connection created")
+        logging.info("[%s] New local trigger connection created",
+                     self.__class__)
         
     def handle_expt(self):
-        logging.warning("Socket exception occured for %s on local trigger socket", self.addr)
+        logging.warning("[%s] Socket exception occured for %s on local " +\
+                        "trigger socket", self.__class__, self.addr)
     
     def handle_close(self):
         del self.server.conns[self.id]

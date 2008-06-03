@@ -229,7 +229,8 @@ class C2SSubscriptionHandler(ThreadedHandler):
             type = tree[0].get('type')
             
             if not cjid:
-                logging.warning('[presence] No contact jid specified in subscription query. Tree: %s', tree[0])
+                logging.warning('[%s] No contact jid specified in subscription ' +\
+                                'query. Tree: %s', self.__class__, tree[0])
                 # TODO: throw exception here
                 return
             
@@ -287,8 +288,8 @@ class C2SSubscriptionHandler(ThreadedHandler):
                 
             elif type == 'subscribed':
                 if not cinfo:
-                    logging.warning("'subscribed' presence received for " +\
-                                    "non-existant contact")
+                    logging.warning("[%s] 'subscribed' presence received for " +\
+                                    "non-existant contact", self.__class__)
                 else:
                     subscription = cinfo.subscription
                     if cinfo.subscription in (Subscription.NONE_PENDING_IN,

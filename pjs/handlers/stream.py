@@ -24,7 +24,8 @@ class InStreamInitHandler(Handler):
             streamType = 'server'
         else:
             # TODO: send <bad-namespace-prefix/>
-            logging.warning("Unknown stream namespace: %s", ns)
+            logging.warning("[%s] Unknown stream namespace: %s",
+                            self.__class__, ns)
             return lastRetVal
         
         # TODO: version check
@@ -137,7 +138,8 @@ class NewS2SConnHandler(ThreadedHandler):
             if 'new-s2s-conn' not in d or \
                 'hostname' not in d['new-s2s-conn'] or \
                 'ip' not in d['new-s2s-conn']:
-                logging.warning("[NewS2SConnHandler] Invoked without necessary data in connection")
+                logging.warning("[%s] Invoked without necessary data in connection",
+                                self.__class__)
                 return
             
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -150,7 +152,8 @@ class NewS2SConnHandler(ThreadedHandler):
                     serv = server
                     break
             else:
-                logging.warning("[NewS2SConnHandler] Can't find an S2SServer in launcher")
+                logging.warning("[%s] Can't find an S2SServer in launcher",
+                                self.__class__)
                 return
             
             sOutConn = serv.createOutConnection(sock)

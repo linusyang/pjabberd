@@ -41,7 +41,8 @@ class SASLAuthHandler(ThreadedHandler):
                 msg.conn.data['sasl']['mechObj'] = digest
                 return chainOutput(lastRetVal, digest.handle(msg))
             else:
-                logging.warning("Mechanism %s not implemented", mech)
+                logging.warning("[%s] Mechanism %s not implemented",
+                                self.__class__, mech)
             
         def cb(workReq, retVal):
             self.done = True
@@ -85,9 +86,9 @@ class SASLResponseHandler(ThreadedHandler):
             mech = msg.conn.data['sasl']['mechObj']
             if not mech:
                 # TODO: close connection
-                logging.warning("Mech object doesn't exist in connection data for %s",
-                                msg.conn.addr)
-                logging.debug("%s", msg.conn.data)
+                logging.warning("[%s] Mech object doesn't exist in connection data for %s",
+                                self.__class__, msg.conn.addr)
+                logging.debug("[%s] %s", self.__class__, msg.conn.data)
                 return
     
             text = tree[0].text
@@ -128,6 +129,7 @@ class SASLErrorHandler(Handler):
             
             return chainOutput(lastRetVal, el)
         else:
-            logging.warning("SASLErrorHandler was passed a non-SASL exception. Exception: %s",
-                            lastRetVal)
+            logging.warning("[%s] SASLErrorHandler was passed a non-SASL " +\
+                            "exception. Exception: %s",
+                            self.__class__, lastRetVal)
             raise Exception, "can't handle a non-SASL error"

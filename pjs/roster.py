@@ -26,9 +26,9 @@ class Roster:
         try:
             self.items[contactId].groups.append(group)
         except KeyError, e:
-            logging.warning("[roster] Adding a group %s to cid %d " + \
+            logging.warning("[%s] Adding a group %s to cid %d " + \
                             "failed because the cid doesn't exist in the roster",
-                            group, contactId)
+                            self.__class__, group, contactId)
             
     def getContactInfo(self, cjid, includeGroups=True):
         """Returns information about a contact with JID cjid in this user's

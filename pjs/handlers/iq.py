@@ -47,7 +47,7 @@ class IQBindHandler(Handler):
             
             return chainOutput(lastRetVal, res)
         else:
-            logging.warning("No id in <iq>:\n%s", tostring(iq))
+            logging.warning("[%s] No id in <iq>:\n%s", self.__class__, tostring(iq))
             
         return lastRetVal
         
@@ -86,7 +86,8 @@ class IQRosterGetHandler(ThreadedHandler):
             resource = msg.conn.data['user']['resource']
             id = tree[0].get('id')
             if id is None:
-                logging.warning('[roster] No id in roster get query. Tree: %s', tree[0])
+                logging.warning('[%s] No id in roster get query. Tree: %s',
+                                self.__class__, tree[0])
                 # TODO: throw exception here
                 return
             
@@ -147,7 +148,8 @@ class IQRosterUpdateHandler(ThreadedHandler):
             jid = msg.conn.data['user']['jid']
             id = tree[0].get('id')
             if id is None:
-                logging.warning('[roster] No id in roster get query. Tree: %s', tree[0])
+                logging.warning('[%s] No id in roster get query. Tree: %s',
+                                self.__class__, tree[0])
                 # TODO: throw exception here
                 return
             
@@ -157,8 +159,9 @@ class IQRosterUpdateHandler(ThreadedHandler):
             cjid = item.get('jid')
             name = item.get('name')
             if cjid is None:
-                logging.warning("[roster] Client trying to add a roster item " + \
-                                "without a jid. Tree: %s", tree[0])
+                logging.warning("[%s] Client trying to add a roster item " + \
+                                "without a jid. Tree: %s",
+                                self.__class__, tree[0])
                 # TODO: throw exception here
                 return
 
@@ -239,7 +242,7 @@ class RosterPushHandler(ThreadedHandler):
             # we have to be passed a tree to work
             # or a tuple with routingData and a tree
             if not isinstance(lastRetVal, list):
-                logging.warning('lastRetVal is not a list')
+                logging.warning('[%s] lastRetVal is not a list', self.__class__)
                 return
             if isinstance(lastRetVal[-1], Element):
                 if lastRetVal[-1].tag.find('query') == -1:
@@ -254,9 +257,9 @@ class RosterPushHandler(ThreadedHandler):
                                 self.__class__, lastRetVal)
                     return
             else:
-                logging.warning('Roster push needs either a <query> Element ' +\
+                logging.warning('[%s] Roster push needs either a <query> Element ' +\
                                 'as the last item in lastRetVal or a tuple ' + \
-                                'with (routeData, query Element)')
+                                'with (routeData, query Element)', self.__class__)
                 return
             
             # this is the roster <query> that we'll send
@@ -331,7 +334,8 @@ class IQNotImplementedHandler(Handler):
             # get the original iq msg
             origIQ = tree[0]
         else:
-            logging.warning("Original <iq> missing:\n%s", tostring(tree))
+            logging.warning("[%s] Original <iq> missing:\n%s",
+                            self.__class__, tostring(tree))
             return
         
         id = origIQ.get('id')
@@ -350,6 +354,7 @@ class IQNotImplementedHandler(Handler):
             
             return chainOutput(lastRetVal, res)
         else:
-            logging.warning("No id in <iq>:\n%s", tostring(origIQ))
+            logging.warning("[%s] No id in <iq>:\n%s",
+                            self.__class__, tostring(origIQ))
         
         return lastRetVal

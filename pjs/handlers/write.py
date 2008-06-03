@@ -40,7 +40,9 @@ def prepareDataForSending(lastRetVal):
             elif isinstance(item, unicode):
                 out += item
             else:
-                logging.warning("prepareDataForSending: Attempting to write an object of" +\
-                                " type %s to socket", type(item))
+                logging.warning("[prepareDataForSending] Attempting to " +\
+                                "write an object of" +\
+                                " type %s to socket",
+                                type(item))
                 
     return out
