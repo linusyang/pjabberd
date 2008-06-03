@@ -85,8 +85,9 @@ class Plain:
                 raise SASLIncorrectEncodingError
             
             c = DB().cursor()
-            c.execute("SELECT * FROM users WHERE \
-                username = ? AND password = ?", (auth[1], auth[2]))
+            c.execute("SELECT * FROM jids WHERE \
+                jid = ? AND password = ?", (auth[1] + \
+                                            '@' + self.msg.conn.server.hostname, auth[2]))
             res = c.fetchall()
             if len(res) == 0:
                 raise SASLAuthError
@@ -186,8 +187,8 @@ class DigestMD5:
             
             # fetch the password now
             c = DB().cursor()
-            c.execute("SELECT password FROM users WHERE \
-                username = ?", (username,))
+            c.execute("SELECT password FROM jids WHERE \
+                jid = ?", (username + '@%s' % msg.conn.server.hostname,))
             for row in c:
                 password = row['password']
                 break

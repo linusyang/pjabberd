@@ -65,5 +65,9 @@ handlers = {
             'iq-session' : {
                           'handler' : pjs.handlers.iq.IQSessionHandler,
                           'description' : 'handles session binding'
-                          }
+                          },
+            'iq-roster-get' : {
+                               'handler' : pjs.handlers.iq.IQRosterGetHandler,
+                               'description' : 'handles roster get requests'
+                               }
             }

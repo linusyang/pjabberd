@@ -12,6 +12,7 @@ from pjs.utils import FunctionCall
 from pjs.elementtree.ElementTree import Element
 
 class SASLAuthHandler(ThreadedHandler):
+    """Handles SASL's <auth> element sent from the other side"""
     def __init__(self):
         # this is true when the threaded handler returns
         self.done = False
@@ -19,14 +20,13 @@ class SASLAuthHandler(ThreadedHandler):
         self.retVal = None
         
     def handle(self, tree, msg, lastRetVal=None):
-        """Handles SASL's <auth> element sent from the other side"""
         
         self.done = False
         
         tpool = msg.conn.server.threadpool
         
         # the actual function executing in the thread
-        def act(tree, msg):
+        def act():
             mech = tree[0].get('mechanism')
             
             if mech == 'PLAIN':
@@ -51,9 +51,7 @@ class SASLAuthHandler(ThreadedHandler):
             else:
                 self.retVal = retVal
             
-        req = threadpool.makeRequests(act,
-                                 [(None, {'tree' : tree, 'msg' : msg})],
-                                 cb)
+        req = threadpool.makeRequests(act, None, cb)
         
         def checkFunc():
             # need to poll manually or the callback's never called from the pool
@@ -83,7 +81,7 @@ class SASLResponseHandler(ThreadedHandler):
         tpool = msg.conn.server.threadpool
         
         # the actual function executing in the thread
-        def act(tree, msg):
+        def act():
             mech = msg.conn.data['sasl']['mechObj']
             if not mech:
                 # TODO: close connection
@@ -106,9 +104,7 @@ class SASLResponseHandler(ThreadedHandler):
             else:
                 self.retVal = retVal
             
-        req = threadpool.makeRequests(act,
-                                 [(None, {'tree' : tree, 'msg' : msg})],
-                                 cb)
+        req = threadpool.makeRequests(act, None, cb)
         
         def checkFunc():
             # need to poll manually or the callback's never called from the pool
@@ -132,5 +128,6 @@ class SASLErrorHandler(Handler):
             
             return chainOutput(lastRetVal, el)
         else:
-            logging.warning("SASLErrorHandler was passed a non-SASL exception")
+            logging.warning("SASLErrorHandler was passed a non-SASL exception. Exception: %s",
+                            lastRetVal)
             raise Exception, "can't handle a non-SASL error"

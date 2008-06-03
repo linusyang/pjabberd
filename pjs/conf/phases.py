@@ -77,6 +77,11 @@ stanzaPhases = {
                                 'xpath' : "{jabber:client}iq[@type='set']/{urn:ietf:params:xml:ns:xmpp-session}session",
                                 'handlers' : [h['iq-session'], h['write']]
                                 },
+                'iq-roster-get' : {
+                                   'description' : 'client requesting their roster',
+                                   'xpath' : "{jabber:client}iq[@type='get']/{jabber:iq:roster}query",
+                                   'handlers' : [h['iq-roster-get'], h['write']]
+                                   },
                 'iq-disco-items' : {
                                     'description' : 'discovery',
                                     'xpath' : "{jabber:client}iq[@type='get']/{http://jabber.org/protocol/disco#items}query",

@@ -220,13 +220,17 @@ def makeRequests(callable, args_list, callback=None):
     """
 
     requests = []
-    for item in args_list:
-        if isinstance(item, tuple):
-            requests.append(
-              WorkRequest(callable, item[0], item[1], callback=callback))
-        else:
-            requests.append(
-              WorkRequest(callable, [item], None, callback=callback))
+    if args_list is None:
+        requests.append(
+              WorkRequest(callable, None, None, callback=callback))
+    else:
+        for item in args_list:
+            if isinstance(item, tuple):
+                requests.append(
+                  WorkRequest(callable, item[0], item[1], callback=callback))
+            else:
+                requests.append(
+                  WorkRequest(callable, [item], None, callback=callback))
     return requests
 
 

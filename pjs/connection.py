@@ -19,21 +19,24 @@ class Connection(asyncore.dispatcher_with_send):
         self.data['stream'] = {
                                'in-stream' : False, # False before <stream> sent and after </stream>
                                'type' : 'c2s',
-                               'id' : ''
+                               'id' : '',
                                }
         self.data['sasl'] = {
                              'mech' : 'DIGEST-MD5', # or PLAIN
                              'mechObj' : None, # <reference to one of SASL mech objects>
-                             'complete' : False
+                             'complete' : False,
                              }
         self.data['tls'] = {
                             'enabled' : False,
-                            'complete' : False
+                            'complete' : False,
                             }
         self.data['user'] = {
                              'jid' : '',
                              'resource' : '',
-                             'in-session' : False # True if <session> sent/accepted
+                             'in-session' : False, # True if <session> sent/accepted
+                             'requestedRoster' : False, # True when sent the roster iq get
+                                                        # when False, we shouldn't send it presence
+                                                        # updates
                              }
         
         logging.info("New connection accepted from %s", self.addr)

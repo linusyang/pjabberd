@@ -71,12 +71,44 @@ if __name__ == '__main__':
     con = DB()
     c = con.cursor()
     try:
-        c.execute("CREATE TABLE users (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,\
-                                       jid TEXT NOT NULL,\
-                                       username TEXT NOT NULL,\
-                                       password TEXT NOT NULL,\
-                                       UNIQUE(jid))")
-        c.execute("INSERT INTO users (jid, username, password) VALUES ('tro@localhost', 'tro', 'test')")
+        c.execute("CREATE TABLE jids (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,\
+                                        jid TEXT NOT NULL,\
+                                        password TEXT NOT NULL,\
+                                        UNIQUE(jid))")
+        c.execute("CREATE TABLE roster (userid INTEGER REFERENCES jids NOT NULL,\
+                                        contactid INTEGER REFERENCES jids NOT NULL,\
+                                        name TEXT,\
+                                        subscription INTEGER REFERENCES substates DEFAULT 0 NOT NULL,\
+                                        PRIMARY KEY (userid, contactid)\
+                                        )")
+        c.execute("CREATE TABLE rostergroups (groupid INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,\
+                                              userid INTEGER REFERENCES jids NOT NULL,\
+                                              name TEXT NOT NULL,\
+                                              UNIQUE(userid, name)\
+                                              )")
+        c.execute("CREATE TABLE rostergroupitems\
+                    (groupid INTEGER REFERENCES rostergroup NOT NULL,\
+                     contactid INTEGER REFERENCES jids NOT NULL,\
+                     PRIMARY KEY (groupid, contactid))")
+        c.execute("CREATE TABLE substates (stateid INTEGER PRIMARY KEY NOT NULL,\
+                                           name TEXT NOT NULL,\
+                                           primaryname TEXT NOT NULL)")
+        c.execute("INSERT INTO jids (jid, password) VALUES ('tro@localhost', 'test')")
+        c.execute("INSERT INTO jids (jid, password) VALUES ('dv@localhost', 'test')")
+        c.execute("INSERT INTO substates (stateid, name, primaryName) VALUES (0, 'None', 'none')")
+        c.execute("INSERT INTO substates (stateid, name, primaryName) VALUES (1, 'None + Pending Out', 'none')")
+        c.execute("INSERT INTO substates (stateid, name, primaryName) VALUES (2, 'None + Pending In', 'none')")
+        c.execute("INSERT INTO substates (stateid, name, primaryName) VALUES (3, 'None + Pending Out/In', 'none')")
+        c.execute("INSERT INTO substates (stateid, name, primaryName) VALUES (4, 'To', 'to')")
+        c.execute("INSERT INTO substates (stateid, name, primaryName) VALUES (5, 'To + Pending In', 'to')")
+        c.execute("INSERT INTO substates (stateid, name, primaryName) VALUES (6, 'From', 'from')")
+        c.execute("INSERT INTO substates (stateid, name, primaryName) VALUES (7, 'From + Pending Out', 'from')")
+        c.execute("INSERT INTO substates (stateid, name, primaryName) VALUES (8, 'Both', 'both');")
+        c.execute("INSERT INTO roster (userid, contactid, subscription) VALUES (1, 2, 8)")
+        c.execute("INSERT INTO roster (userid, contactid, subscription) VALUES (2, 1, 8)")
+        c.execute("INSERT INTO rostergroups (userid, name) VALUES (1, 'friends')")
+        c.execute("INSERT INTO rostergroups (userid, name) VALUES (1, 'weirdos')")
+        c.execute("INSERT INTO rostergroupitems (groupid, contactid) VALUES (1, 2)")
     except sqlite.OperationalError, e:
         if e.message.find('already exists') >= 0: pass
         else: raise
