@@ -198,11 +198,27 @@ class IQRosterUpdateHandler(ThreadedHandler):
                      'data' : out
                      }
                 
-                roster.removeContact(cjid)
                 query = deepcopy(tree[0])
                 
                 retVal = chainOutput(lastRetVal, query)
-
+                
+                if roster.removeContact(cjid) is False:
+                    # We don't even have this contact in the roster anymore.
+                    # The contact is probably local (like ourselves).
+                    # This happens with some clients (like pidgin/gaim) who
+                    # cache the roster and don't delete some items even when
+                    # they're not present in the roster the server sends out
+                    # anymore. If we send the presence here it
+                    # will probably arrive after roster-push (due to s2s)
+                    # and will confuse the clients into thinking they still
+                    # have that contact in their roster. This creates an
+                    # undeletable contact. We can't do much about this.
+                    # If/when the s2s component can do a shortcut delivery of
+                    # stanzas to local users, while in the same phase, this
+                    # problem should go away, as it will allow the roster-push
+                    # to arrive after presences every time.
+                    pass
+                    
                 # route the presence first, then do a roster push
                 msg.setNextHandler('roster-push')
                 msg.setNextHandler('route-server')
@@ -324,6 +340,8 @@ class RosterPushHandler(ThreadedHandler):
                                         })
                     iq.append(query)
                     
+                    # TODO: remove this. debug.
+                    logging.debug("Sending " + tostring(iq))
                     con.send(tostring(iq))
 
             if tree.tag == '{jabber:client}iq' and tree.get('id'):

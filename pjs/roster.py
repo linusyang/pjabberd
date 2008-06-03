@@ -176,7 +176,7 @@ class Roster:
                          self.__class__, cjid, self.jid)
             commitSQLiteTransaction(con, c)
             con.close()
-            return
+            return False
         
         # delete the contact from all groups it's in for this user
         c.execute("DELETE FROM rostergroupitems\
