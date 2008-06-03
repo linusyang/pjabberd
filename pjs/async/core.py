@@ -2,6 +2,8 @@ from asyncore import *
 from asyncore import _exception
 import asyncore
 
+import pjs.utils
+
 try:
     func_map # dictionary of FunctionCall => callback
 except NameError:
@@ -127,10 +129,10 @@ class dispatcherWithFunctions(asyncore.dispatcher):
         cb will be passed the exception as a parameter, so it should be of the
         form: def cb(exception=None)
         """
-        assert(hasattr(checkFunc, 'func') and callable(cb))
+        assert(isinstance(checkFunc, pjs.utils.FunctionCall) and callable(cb))
 
         if (initFunc):
-            assert(hasattr(initFunc, 'func'))
+            assert(isinstance(initFunc, pjs.utils.FunctionCall))
             try:
                 initFunc.func(*initFunc.funcArgs)
             except Exception, e:
