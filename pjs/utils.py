@@ -37,9 +37,17 @@ class FunctionCall:
     
 
 def generateId():
+    """Generates a unique id for anything"""
     return sha1(str((random(), time.gmtime(), os.getpid()))).hexdigest()
 
 def tostring(tree):
+    """Converts ET's Element into an XML string. It assumes the default
+    namespace is jabber:client or jabber:server and strips those out.
+    For other elements it attaches the xmlns attribute to their ns-clear tags.
+    This is a workaround for ET's broken tostring(), which returns crazy stuff
+    like:
+    <ns0:a xmlns:ns0="asdf"><ns0:b>asdfasdf</ns0:b></ns0:a>
+    """
     def processTree(tree):
         res, tag = decurl(tree.tag)
         res = u'<' + res
@@ -60,6 +68,9 @@ def tostring(tree):
     return res
 
 def decurl(tagName):
+    """Returns the "tag xmls='ns'" and 'tag' tuple. This is for parsing out
+    the tag name and the namespace out of ElementTree's Elements.
+    """
     res = standardNSre.sub('', tagName)
     res = customNSre.sub(r"\2 xmlns='\1'", res)
     end = res.find(' ')
