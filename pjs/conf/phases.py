@@ -6,6 +6,14 @@ from pjs.conf.handlers import handlers as h
 # TODO: add ordering to phases, so that we can decide on conflicts
 
 class PrioritizedDict(dict):
+    """A dictionary that has order during iteration based on a 'priority'
+    key of every key/value pair. The higher the priority value the earlier
+    the pair will come in an iteration.
+    
+    Example: d = {'a' : {'name' : 'A'}, 'b' : {'name' : 'B', 'priority' : 1}}
+    When iterated over, the 'b' pair with priority 1 will come first, since the
+    default priority is 0.
+    """
     def __init__(self, d=None):
         self.priolist = []
         if d is not None:
@@ -152,7 +160,7 @@ _c2sStanzaPhases = {
     'subscription' : {
                       'description' : 'subscription handling',
                       'xpath' : "{jabber:client}presence[@type]",
-                      'handlers' : [h['subscription']],
+                      'handlers' : [h['c2s-subscription']],
                       'priority' : 1
                       }
     }
@@ -166,7 +174,7 @@ _s2sStanzaPhases = {
     'subscription' : {
                       'description' : 'subscription handling',
                       'xpath' : "{jabber:server}presence[@type]",
-                      'handlers' : [],
+                      'handlers' : [h['s2s-subscription']],
                       'priority' : 1
                       },
     's2s-presence' : {

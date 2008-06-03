@@ -17,16 +17,15 @@ class PJSLauncher:
         
         self.hostname = 'localhost'
         
-        self.router = Router(self)
+        self.router, self._c2s, self._s2s = (None, None, None)
         
     def run(self):
         from pjs.server import C2SServer, S2SServer
-        c2s = C2SServer(self.hostname, self.c2sport, self)
-        self.servers.append(c2s)
+        self._c2s = C2SServer(self.hostname, self.c2sport, self)
+        self.servers.append(self._c2s)
         
-        s2s = S2SServer(self.hostname, self.s2sport, self)
-        self.router.setConnMap(s2s.s2sConns)
-        self.servers.append(s2s)
+        self._s2s = S2SServer(self.hostname, self.s2sport, self)
+        self.servers.append(self._s2s)
         
         from pjs.connection import LocalTriggerConnection
         
@@ -36,8 +35,15 @@ class PJSLauncher:
         def notifyFunc():
             self.triggerConn.send(' ')
             
-        c2s.createThreadpool(5, notifyFunc)
-        s2s.createThreadpool(5, notifyFunc)
+        self._c2s.createThreadpool(5, notifyFunc)
+        self._s2s.createThreadpool(5, notifyFunc)
+        
+        self.router = Router(self)
+        
+    def getC2SServer(self):
+        return self._c2s
+    def getS2SServer(self):
+        return self._s2s
 
 if __name__ == '__main__':
     launcher = PJSLauncher()
@@ -96,11 +102,11 @@ if __name__ == '__main__':
                      PRIMARY KEY (groupid, contactid))")
         c.execute("INSERT INTO jids (jid, password) VALUES ('tro@localhost', 'test')")
         c.execute("INSERT INTO jids (jid, password) VALUES ('dv@localhost', 'test')")
-        c.execute("INSERT INTO roster (userid, contactid, subscription) VALUES (1, 2, 8)")
-        c.execute("INSERT INTO roster (userid, contactid, subscription) VALUES (2, 1, 8)")
-        c.execute("INSERT INTO rostergroups (userid, name) VALUES (1, 'friends')")
-        c.execute("INSERT INTO rostergroups (userid, name) VALUES (1, 'weirdos')")
-        c.execute("INSERT INTO rostergroupitems (groupid, contactid) VALUES (1, 2)")
+#        c.execute("INSERT INTO roster (userid, contactid, subscription) VALUES (1, 2, 8)")
+#        c.execute("INSERT INTO roster (userid, contactid, subscription) VALUES (2, 1, 8)")
+#        c.execute("INSERT INTO rostergroups (userid, name) VALUES (1, 'friends')")
+#        c.execute("INSERT INTO rostergroups (userid, name) VALUES (1, 'weirdos')")
+#        c.execute("INSERT INTO rostergroupitems (groupid, contactid) VALUES (1, 2)")
     except sqlite.OperationalError, e:
         if e.message.find('already exists') >= 0: pass
         else: raise

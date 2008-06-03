@@ -92,10 +92,14 @@ handlers = {
                               'handler' : pjs.handlers.presence.S2SPresenceHandler,
                               'description' : 'handles plain presence from servers'
                               },
-            'subscription' : {
-                              'handler' : pjs.handlers.presence.SubscriptionHandler,
-                              'description' : 'takes care of subscriptions'
-                              },
+            'c2s-subscription' : {
+                                  'handler' : pjs.handlers.presence.C2SSubscriptionHandler,
+                                  'description' : 'subscriptions from clients'
+                                  },
+            's2s-subscription' : {
+                                  'handler' : pjs.handlers.presence.S2SSubscriptionHandler,
+                                  'description' : 'subscriptions from servers'
+                                  },
             'new-s2s-conn' : {
                               'handler' : pjs.handlers.stream.NewS2SConnHandler,
                               'description' : 'creates a new S2S connection and sends initial stream'

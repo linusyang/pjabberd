@@ -27,10 +27,6 @@ class Server(dispatcher):
         # TODO: make this accessible even when the server's clustered
         #       ie. different machines should be able to access this.
         self.data = {}
-        self.data['resources'] = {}
-#        self.data['resources']['tro@localhost'] = {
-#                                                   'resource' : <Connection obj>
-#                                                   }
         self.data['info'] = {}
         
     def createThreadpool(self, numWorkers, notifyFunc=None):
@@ -50,6 +46,11 @@ class Server(dispatcher):
 class C2SServer(Server):
     def __init__(self, ip, port, launcher):
         Server.__init__(self, ip, port, launcher)
+
+        self.data['resources'] = {}
+#        self.data['resources']['tro@localhost'] = {
+#                                                   'resource' : <Connection obj>
+#                                                   }
         self.data['info']['type'] = 'c2s'
         
     def handle_accept(self):

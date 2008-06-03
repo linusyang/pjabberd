@@ -253,12 +253,10 @@ class RosterPushHandler(ThreadedHandler):
                                 self.__class__, lastRetVal)
                 return
             
-            id = tree[0].get('id')
-            
             jid = msg.conn.data['user']['jid']
             resource = msg.conn.data['user']['resource']
             
-            # replace the <query> in lastRetVal with an ack to client
+            # this is the roster <query>
             query = lastRetVal.pop(-1)
             
             resources = msg.conn.server.data['resources'][jid]
@@ -273,16 +271,17 @@ class RosterPushHandler(ThreadedHandler):
                     iq.append(query)
                     
                     con.send(tostring(iq))
-                
-            # send an ack to client
-            d = {
-                 'to' : '%s/%s' % (jid, resource),
-                 'type' : 'result',
-                 }
-            if id: d['id'] = id
-            
-            iq = Element('iq', d)
-            return chainOutput(lastRetVal, iq)
+
+            if tree[0].tag == '{jabber:client}iq' and tree[0].get('id'):
+                # send an ack to client if this is in reply to a roster get/set
+                id = tree[0].get('id')
+                d = {
+                     'to' : '%s/%s' % (jid, resource),
+                     'type' : 'result',
+                     'id' : id
+                     }
+                iq = Element('iq', d)
+                return chainOutput(lastRetVal, iq)
         
         def cb(workReq, retVal):
             self.done = True

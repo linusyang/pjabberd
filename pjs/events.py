@@ -54,7 +54,7 @@ class Message:
     def process(self):
         """Runs the handlers.
         
-        Puts the contents of self.outputBuffer onto Dispatcher's resultQ
+        Puts the contents of self.outputBuffer onto Dispatcher's resultQ.
         """
         
         # If we don't have error handlers, that's ok, but if we don't have
@@ -142,7 +142,8 @@ class Message:
                     logging.warning("Unknown error handler type (%s) for %s",
                                     type(errorHandler), errorHandler)
             else:
-                logging.warning("No error handler assigned for %s", handler)
+                logging.warning("No error handler assigned for %s. " +\
+                                "Last exception: %s", handler, self._lastRetVal)
                 
             self._updateRunningHandlers()
         else:
@@ -196,10 +197,31 @@ def _runMessages():
     """Runs all queued Messages that don't have an existing Message
     being processed for the same connection id.
     """
-    for connId, msg in _processingQ:
+    # I don't care about the Pythonic Way, if it doesn't allow me to remove
+    # items from a list I'm iterating on. We could iterate on a copy of the
+    # list, but I'm afraid that the processingQ could get pretty large with
+    # lots of connections.
+    i = 0
+    l = len(_processingQ)
+    connId, msg = (None, None)
+    while i < l:
+        connId, msg = _processingQ[i]
         if connId not in _runningMessages:
             _runningMessages[connId] = msg
+            # moved to runningMessages, so delete from processingQ
+            del _processingQ[i]
+            i -= 1
+            l -= 1
+            
             msg.process()
+        i += 1
+    
+#    for connId, msg in _processingQ:
+#        if connId not in _runningMessages:
+#            _runningMessages[connId] = msg
+#            completed = msg.process()
+#            if completed:
+#                del _processingQ[(connId, msg)]
 
 activeServers = pjs.conf.conf.launcher.servers
             

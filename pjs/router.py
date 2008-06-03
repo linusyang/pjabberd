@@ -1,5 +1,4 @@
 import logging
-import socket
 
 from pjs.elementtree.ElementTree import Element
 from pjs.handlers.write import prepareDataForSending
@@ -12,48 +11,76 @@ class Router:
         """Initialize the router with a pointer to the server"""
         self.launcher = launcher
         self.hostname = launcher.hostname
-        self.conns = None
+        self.c2sserver = launcher.getC2SServer()
+        self.s2sserver = launcher.getS2SServer()
+        self.s2sConns = self.s2sserver.s2sConns
         
-    def setConnMap(self, map):
+    def setS2SConnMap(self, connMap):
         """This is the connection map that will be used to lookup domains
         during routing. This should be an S2S connection map of the form:
         {'hostname' : (Connection object in, Connection object out)}
+        
+        Not used right now, but may be in the future.
         """
-        self.conns = map
+        self.s2sConns = connMap
+
+    def routeToClient(self, msg, data, to=None):
+        """Routes 'data' to its recipient (client). 'To' should be either a
+        string JID or a JID object. If 'to' is not specified, the relevant
+        information is extracted from 'data'. If that fails, the method
+        returns False.
+        msg: Message object. Needed to look up client conns.
+        """
+        conns = self.c2sserver.conns
+        
+        to = self.getRoute(data, to)
+        if not to:
+            return False
+        
+        jid = self.getJID(to)
+        if not jid:
+            return False
+        
+        if jid.resource:
+            # locate the resource of this JID
+            def f(i):
+                return conns[i][0] == jid
+        else:
+            # locate all active resources of this JID
+            def f(i):
+                jidConn = conns[i]
+                if not jidConn[0]: return False
+                return jidConn[0].node == jid.node and jidConn[0].domain == jid.domain
+            
+        activeJids = filter(f, conns)
+        for con in activeJids:
+            conns[con][1].send(prepareDataForSending(data))
     
-    def route(self, msg, data, to=None):
-        """Routes 'data' to its recipient. 'To' should be a bare JID. If 'to'
-        is not specified, the relevant information is extracted from 'data'.
-        If that fails, the method returns False.
+    def routeToServer(self, msg, data, to=None):
+        """Routes 'data' to its recipient. 'To' should be either a string JID
+        or a JID object. If 'to' is not specified, the relevant information is
+        extracted from 'data'. If that fails, the method returns False.
         msg: Message object. Needed in case we need to create a new S2S
             connection.
         """
         # TODO: implement S2S
         # for now, just route to ourselves
         
-        if self.conns is None:
+        if self.s2sConns is None:
             return False
         
+        to = self.getRoute(data, to)
         if not to:
-            if isinstance(data, Element):
-                to = data.get('to')
-                if not to:
-                    return False
-            else:
-                # can't extract routing information
-                logging.warning("Can't extract routing information from %s", data)
-                return False
-            
-        try:
-            jid = JID(to)
-        except Exception, e:
-            logging.warning(e)
+            return False
+        
+        jid = self.getJID(to)
+        if not jid:
             return False
 
         # do we have an existing connection to the domain?
-        if jid.domain in self.conns:
+        if jid.domain in self.s2sConns:
             # reuse that connection
-            self.conns[jid.domain][1].send(prepareDataForSending(data))
+            self.s2sConns[jid.domain][1].send(prepareDataForSending(data))
         else:
             # create a new S2S connection
             # populate the dictionary for the new s2s connection creator
@@ -71,3 +98,30 @@ class Router:
             msg.setNextHandler('new-s2s-conn')
         
         return True
+    
+    def getRoute(self, data, to):
+        """Figure out the route from the data"""
+        if to: return to
+        else:
+            if isinstance(data, Element):
+                to = data.get('to')
+                if not to:
+                    return False
+            else:
+                # can't extract routing information
+                logging.warning("[router] Can't extract routing information from %s", data)
+                return False
+            
+        return to
+
+    def getJID(self, to):
+        """Convert 'to' to a JID object"""
+        if isinstance(to, JID):
+            jid = to
+        else:
+            try:
+                jid = JID(to)
+            except Exception, e:
+                logging.warning(e)
+                return False
+        return jid

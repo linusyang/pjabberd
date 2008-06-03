@@ -19,6 +19,9 @@ class JID:
         self.domain = m.group(3)
         self.resource = m.group(5)
         
+    def getBare(self):
+        return '%s@%s' % (self.node, self.domain)
+        
     def __cmp__(self, other):
         assert isinstance(other, JID)
         if self.node == other.node and self.domain == other.domain\

@@ -63,14 +63,16 @@ class Roster:
         else:
             return RosterItem(cjid, name, sub, id=cid)
     
-    def updateContact(self, cjid, groups, name=None):
+    def updateContact(self, cjid, groups, name=None, subscriptionId=None):
         """Adds or updates a contact in this user's roster. Returns the
         contact's id in the DB.
         groups can be None, which means that all groups have been removed
         or none need to be added.
         """
         
+        name = name or ''
         groups = groups or []
+        subscriptionId = subscriptionId or Subscription.NONE
         
         c = DB().cursor()
         
@@ -85,8 +87,9 @@ class Roster:
             # this is an update
             # we don't update the subscription as it's the job of <presence>
             cid = res[0]
-            c.execute("UPDATE roster SET name = ? WHERE contactid = ?",
-                      (name or '', cid))
+            c.execute("UPDATE roster SET name = ?, subscription = ?\
+                       WHERE contactid = ?",
+                      (name, cid, subscriptionId))
         else:
             # this is a new roster entry
             
@@ -106,7 +109,7 @@ class Roster:
             c.execute("INSERT INTO roster\
                        (userid, contactid, name, subscription)\
                        VALUES\
-                       (?, ?, ?, ?)", (self.uid, cid, name or '', Subscription.NONE))
+                       (?, ?, ?, ?)", (self.uid, cid, name, subscriptionId))
                 
                 
         # UPDATE GROUPS

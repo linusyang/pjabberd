@@ -109,6 +109,9 @@ def readwrite(obj, flags):
         obj.handle_error()
 
 def poll(timeout=0.0, map=None):
+    # pick up results from Messages and process queued
+    pjs.events.pickupResults()
+    
     if map is None:
         map = socket_map
     if map:
@@ -133,9 +136,6 @@ def poll(timeout=0.0, map=None):
                 else:
                     return
                 
-        # pick up results from Messages and process queued
-        pjs.events.pickupResults()
-
         for fd in r:
             obj = map.get(fd)
             if obj is None:
