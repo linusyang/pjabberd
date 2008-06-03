@@ -163,6 +163,7 @@ class Roster:
                        (?, ?)", (gid, cid))
         
         commitSQLiteTransaction(con, c)
+        con.close()
             
         return cid
     
@@ -185,6 +186,7 @@ class Roster:
             logging.info("[%s] Contact %s does not exist in roster of %s",
                          self.__class__, cjid, self.jid)
             commitSQLiteTransaction(con, c)
+            con.close()
             return
         
         # delete the contact from all groups it's in for this user
@@ -200,6 +202,7 @@ class Roster:
                    WHERE userid = ? AND contactid = ?", (self.uid, cid))
         
         commitSQLiteTransaction(con, c)
+        con.close()
         
         return cid
         
@@ -231,6 +234,7 @@ class Roster:
         c.execute("UPDATE roster SET subscription = ?\
                    WHERE userid = ? AND contactid = ?", (sub, self.uid, cid))
         commitSQLiteTransaction(con, c)
+        con.close()
     
     def getSubPrimaryName(self, cid):
         """Gets the primary name of a subscription for this user and this
@@ -308,8 +312,7 @@ class Roster:
             self.addGroup(row['contactid'], row['name'])
             
         commitSQLiteTransaction(con, c)
-            
-        c.close()
+        con.close()
     
     def getAsTree(self):
         """Returns the roster Element tree starting from <query>. Call
