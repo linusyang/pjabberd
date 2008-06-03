@@ -203,7 +203,7 @@ def makeRequests(callable, args_list, callback=None):
 
     requests = []
     for item in args_list:
-        if item == isinstance(item, tuple):
+        if isinstance(item, tuple):
             requests.append(
               WorkRequest(callable, item[0], item[1], callback=callback))
         else:
