@@ -25,7 +25,19 @@
 
 <h3>XML Representation</h3>
 
-<p><a href="http://effbot.org/zone/element-index.htm">ElementTree</a> is the XML library used throughout the framework. We needed XPath support, so we bundled the 1.3alpha3 version with pjabberd. Handlers are passed the parsed messages via the <code>tree</code> parameter as an instance of the <code>Element</code> class. ElementTree's parser (expat) strips the <code>xmlns</code> attributes on XML elements and changes &lt;elementname&gt; to &lt;{namespace}elementname&gt;. In order to send out uniform XML, all handlers should use <code>tostring()</code> found in <code>pjs.utils</code>, and not ElementTree's <code>tostring()</code>, since the latter produces incorrect namespaces.</p>
+<p><a href="http://effbot.org/zone/element-index.htm">ElementTree</a> is the XML library used throughout the framework. We needed XPath support, so we bundled the 1.3alpha3 version with pjabberd. Handlers are passed the parsed messages via the <code>tree</code> parameter as an instance of the <code>Element</code> class. ElementTree's parser (expat) strips the <code>xmlns</code> attributes on XML elements and changes <code>&lt;elementname&gt;</code> to <code>&lt;{namespace}elementname&gt;</code>. In order to send out uniform XML, all handlers should use <code>tostring()</code> found in <code>pjs.utils</code>, and not ElementTree's <code>tostring()</code>, since the latter produces incorrect namespaces.</p>
+
+<h3>Parser</h3>
+
+<p>The standard Python's expat parser is used for parsing the incoming XML data. It is a stream parser, which means that it does not need to see the entire XML document to generate XML events. As soon as it sees an opening tag it generates an event; when it sees the closing tag it also generates an event, and so on. <code>pjs.parsers</code> defines the <code>IncrStreamParser</code>, which should be enough for most purposes. It builds an <code>Element</code> from the incoming data and passes it to a <code>Dispatcher</code>, so that it may create a <code>Message</code> object and start the processing. It catches exceptions and provides allows to recover and continue processing. This is done for some clients, like Kopete that do not start a new <code>&lt;stream&gt;</code> after authentication is completed (which is contrary to the spec). The parser notices a missing stream in <code>handle_start()</code> and recovers in <code>feed()</code>.</p>
+
+<h3>Overview</h3>
+
+<p>The following is a high-level diagram of the server architecture.</p>
+
+<p><img src="overview.png" alt="Overview" title="" /></p>
+
+<p>Connections without arrows indicate usage and knowledge. Connections with arrows indicate the order during the processing of a message. The symbols <code>*</code> and <code>1</code> indicate the usual number of objects of that kind. It is not meant to imply a UML-like connection. For example, for every instance of a <code>Connection</code> there is only one <code>Parser</code>, and it is not shared between <code>Connection</code>s.</p>
 
 <h3>Asynchronous Connections</h3>
 
@@ -42,13 +54,13 @@
 
 <p><img src="async.png" alt="Asynchronous connections" title="" /></p>
 
-<p><a name="chained-handlers"></a></p>
-
 <h3>Phases</h3>
 
 <p>Every message that comes in is assigned a "phase", a sequence of handlers. The phases are configured in <code>pjs.conf.phases</code> and <code>pjs.conf.handlers</code>. Each phase distinguishes itself from others by its XPath expression. The current version of ElementTree only support basic operations, such as matching on tag name and attributes. The phases are checked in random order, because in Python dictionaries have no order. However, if there are two or more conflicting phases, higher priorities can be assigned to create an artificial ordering. An example of this is 'c2s-presence' and 'subscription' phases for the c2s server. 'c2s-presence' matches on '{jabber:client}presence' and 'subscription' matches on '{jabber:client}presence[@type]'. If there were no priorities in phase lists, a subscription could be interpreted as a simple presence stanza.</p>
 
-<p>Phases define the regular and error handlers (see below) associated with phase. The list can be queried and modified at runtime by handlers to queue others (via <code>Message</code>'s <code>setNextHandler()</code> and <code>setLastHandler()</code>).</p>
+<p>Phases define the regular and error handlers (see below) associated with a phase. The list can be queried and modified at runtime by handlers to queue others (via <code>Message</code>'s <code>setNextHandler()</code> and <code>setLastHandler()</code>). The standard phases don't need xpath expressions defined, since the parser calls them directly. Don't change the names of these phases.</p>
+
+<p><a name="chained-handlers"></a></p>
 
 <h3>Chained Handlers</h3>
 
@@ -60,11 +72,25 @@
 
 <p>The chained handlers design also allows for handling unexpected exceptions. Each handler can be paired with an "error handler" in the same phase. The error handler's <code>handle()</code> method will be executed with the exception being the last element in <code>lastRetVal</code>. If the error handler (A) throws another exception, the next handler is skipped and its error handler (B) is run. If A does not throw and exception then B's regular handler will run next.</p>
 
-<p><img src="handlers.png" alt="" title="" /></p>
+<p><img src="handlers.png" alt="Chained Handlers" title="" /></p>
+
+<h3>Threaded Handlers</h3>
+
+<p>Because we need to allow handlers to perform I/O-based operations, we need to have <code>ThreadedHandler</code>s (see above). Because the entire server is running in a single thread, and because we need to ensure that message processing is occuring in order for any client (see <a href="http://www.xmpp.org/rfcs/rfc3921.html">RFC 3921</a>), the <code>pjs.events</code> keeps a queue of running <code>Message</code>s per connection and skips those that are already running. When a threaded handler is done (that is, when the function is provided to the framework returns <code>True</code>) the handler's <code>resume()</code> function is called within the main thread. Basically, the execution of the handlers chain is brought back into the main process after each each threaded handler's operation completes.</p>
 
 <h2>Data Persistence</h2>
 
+<p>The framework uses SQLite (through <a href="http://oss.itsystementwicklung.de/trac/pysqlite/">pysqlite</a>) to provide persistence for data. This is not required, however. The classes that perform DB operations are independent of specific handlers. Therefore, it is possible to simply switch the handlers to ones that use a different means for storage. In the future, it will be possible to change, through a configuration file or at run time, classes like <code>Roster</code> that perform DB operations.</p>
+
 <h2>Internal Data</h2>
+
+<p>Most internals of pjabberd are stored as python dictionaries. The data stored in a <code>Message</code> object is accessible by handlers through the <code>msg</code> parameter (<code>msg.data</code>). Handlers also have access to <code>Connection</code>s and <code>Server</code>s through the <code>Message</code> object. This will change in the future, as this design is not thread-safe. Most likely, the handlers that want to access server-wide data will have to call locking/unlocking functions or use an API.</p>
+
+<h2>API</h2>
+
+<p>There is no API provided at the moment. Most handlers just access information through dictionaries in the <code>Connection</code>, <code>Server</code> and <code>Message</code> objects. This is simple and extensible, because new handlers can store any arbitrary data in in the dictionaries. The API was not part of a design because it was not clear what data the users of the framework would want to access and how they would like to access it. An API will probably be introduced in the next version.</p>
+
+<p>There are some basic classes like <code>Roster</code> and <code>JID</code> in <code>roster.py</code> and <code>jid.py</code>, respectively.</p>
 
 <div style="display:none">:wrap=soft:maxLineLen=100:noTabs=false:</div>
 </body></html>
