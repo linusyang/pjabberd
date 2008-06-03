@@ -153,7 +153,69 @@ class ServerOutConnection(ServerConnection):
             self.server.s2sConns[hostname][1] = None
         
         ServerConnection.handle_close(self)
-
+        
+class LocalServerInConnection(ServerConnection):
+    """Connection like ServerOutConnection, but for local S2S"""
+    def __init__(self, sock, addr, server):
+        ServerConnection.__init__(self, sock, addr, server)
+        
+        self.id = 'locsin%s' % id(self)
+        
+        self.data['server']['direction'] = 'from'
+        self.data['server']['hostname'] = 'localhost'
+        
+        # send the <stream> to prime the parser for the ns it'll deal with,
+        # but tell it not to process the xml during priming, since we don't
+        # care for auth/encr on a loopback connection
+        self.parser.disable()
+        data = "<?xml version='1.0' ?>" +\
+                "<stream:stream xmlns='jabber:server' " +\
+                "xmlns:stream='http://etherx.jabber.org/streams' " +\
+                "version='1.0'>"
+        self.parser.feed(data)
+        self.parser.depth = 1
+        self.parser.stream = Element('{http://etherx.jabber.org/streams}stream',
+                                     {'version' : '1.0'})
+        self.parser.ns = 'jabber:server'
+        self.parser.enable()
+        
+        logging.info("New LocalServerInConnection created with %s", addr)
+        
+    def handle_close(self):
+        hostname = self.data['server']['hostname']
+        
+        logging.debug("[%s] Closing LocalServerConnection with %s",
+                      self.__class__, hostname)
+        
+        if hostname:
+            self.server.s2sConns[hostname] = (None, None)
+        
+        ServerConnection.handle_close(self)
+        
+    # FIXME: remove this
+    def handle_read(self):
+        data = self.recv(4096)
+        self.parser.feed(data)
+        
+class LocalServerOutConnection(asyncore.dispatcher_with_send):
+    """Simple server out connection for local S2S. All it does is
+    forward all data sent to it to the LocalServerInConnection.
+    """
+    def __init__(self, sock):
+        asyncore.dispatcher_with_send.__init__(self, sock)
+        
+        self.id = 'locsout%s' % id(self)
+        
+        logging.info("New LocalServerOutConnection created with %s", sock.getsockname())
+        
+    def handle_read(self):
+        data = self.recv(4096)
+        self.send(data)
+        
+    def handle_close(self):
+        del self.server.conns[self.id]
+        self.close()
+        
 class LocalTriggerConnection(asyncore.dispatcher_with_send):
     """This creates a local connection back to our server.
     

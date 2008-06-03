@@ -117,6 +117,8 @@ class ServerRouteHandler(Handler):
             newconn = d.setdefault('new-s2s-conn', {})
             newconn['connected'] = False
             newconn['hostname'] = jid.domain
+            if jid.domain == msg.conn.server.launcher.hostname:
+                newconn['local'] = True
             if jid.domain == msg.conn.server.hostname:
                 newconn['ip'] = jid.domain
             else:

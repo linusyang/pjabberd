@@ -1,7 +1,9 @@
 import pjs.threadpool as threadpool
 import socket
 
-from pjs.connection import Connection, ClientConnection, ServerInConnection, ServerOutConnection
+from pjs.connection import Connection, ClientConnection, \
+                           ServerInConnection, ServerOutConnection, \
+                           LocalServerInConnection, LocalServerOutConnection
 from pjs.async.core import dispatcher
 from pjs.utils import SynchronizedDict
 
@@ -76,10 +78,20 @@ class S2SServer(Server):
         conn = ServerOutConnection(sock, sock.getpeername(), self)
         self.conns[conn.id] = ('localhost-out', conn)
         return conn
+    
+    def createLocalConnection(self, sock):
+        conn = LocalServerOutConnection(sock)
+        self.conns[conn.id] = (conn.id, conn)
+        self.s2sConns.setdefault('localhost', [None, None])[1] = conn
+        
+        return conn
         
     def handle_accept(self):
         sock, addr = self.accept()
-        conn = ServerInConnection(sock, addr, self)
+        if addr[0] == '127.0.0.1':
+            conn = LocalServerInConnection(sock, addr, self)
+        else:
+            conn = ServerInConnection(sock, addr, self)
         # TODO: don't assume localhost here
         self.s2sConns.setdefault('localhost', [None, None])[0] = conn
         # we don't know the hostname until stream starts

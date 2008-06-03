@@ -142,36 +142,44 @@ class NewS2SConnHandler(ThreadedHandler):
                                 self.__class__)
                 return
             
+            local = False
+            if d['new-s2s-conn'].get('local'):
+                local = True
+            
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             sock.connect((d['new-s2s-conn']['ip'],
                           d['new-s2s-conn'].setdefault('port', 5269)))
             
-            serv = None
-            for server in pjs.conf.conf.launcher.servers:
-                if isinstance(server, pjs.server.S2SServer):
-                    serv = server
-                    break
-            else:
+            serv = msg.conn.server.launcher.getS2SServer()
+            if not serv:
                 logging.warning("[%s] Can't find an S2SServer in launcher",
                                 self.__class__)
                 return
             
-            sOutConn = serv.createOutConnection(sock)
-            #sOutConn = ServerOutConnection(sock, sock.getsockname(), pjs.conf.conf.launcher)
+            if local:
+                conn = serv.createLocalConnection(sock)
+                # if we're connecting to ourselves, we don't need the <stream>.
+                # instead just send out the outQueue
+                data = d['new-s2s-conn'].get('queue')
+                if data is not None:
+                    conn.send(prepareDataForSending(data))
+            else:
+                sOutConn = serv.createOutConnection(sock)
             
-            # copy over any queued messages to send once fully connected
-            sOutConn.outQueue.extend(d['new-s2s-conn'].setdefault('queue', []))
+                # copy over any queued messages to send once fully connected
+                sOutConn.outQueue.extend(d['new-s2s-conn'].setdefault('queue', []))
+                
+                # register the connection with the S2S server
+                serverConns = serv.s2sConns.setdefault(d['new-s2s-conn']['hostname'], [None, None])
+                serverConns[1] = sOutConn
             
-            # register the connection with the S2S server
-            serv.s2sConns.setdefault(d['new-s2s-conn']['hostname'], [None, None])[1] = sOutConn
-            
-            # send the initial stream
-            # commenting this out for now as it causes expat problems
-            sOutConn.send("<?xml version='1.0' ?>")
-            sOutConn.send("<stream:stream xmlns='jabber:server' " +\
-                          "xmlns:stream='http://etherx.jabber.org/streams' " +\
-                          "to='%s' " % d['new-s2s-conn']['hostname'] + \
-                          "version='1.0'>")
+                # send the initial stream
+                # commenting this out for now as it causes expat problems
+                sOutConn.send("<?xml version='1.0' ?>")
+                sOutConn.send("<stream:stream xmlns='jabber:server' " +\
+                              "xmlns:stream='http://etherx.jabber.org/streams' " +\
+                              "to='%s' " % d['new-s2s-conn']['hostname'] + \
+                              "version='1.0'>")
         
         def cb(workReq, retVal):
             self.done = True

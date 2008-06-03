@@ -67,6 +67,28 @@ class IncrStreamParser:
         self.tree = None
         
         self.resets += 1
+        
+    def disable(self):
+        """Turns off all handlers for this parser, so data will be parsed,
+        but not processed in any way.
+        """
+        assert self._parser
+        
+        self._parser.StartElementHandler = None
+        self._parser.EndElementHandler = None
+        self._parser.CharacterDataHandler = None
+        self._parser.StartNamespaceDeclHandler = None
+        
+    def enable(self):
+        """Use after disable() to reenable the processing of the
+        XML events.
+        """
+        assert self._parser
+        
+        self._parser.StartElementHandler = self.handle_start
+        self._parser.EndElementHandler = self.handle_end
+        self._parser.CharacterDataHandler = self.handle_text
+        self._parser.StartNamespaceDeclHandler = self.handle_ns
 
     def feed(self, data):
         """Read a chunk of data to parse. The complete XML in the chunk will
