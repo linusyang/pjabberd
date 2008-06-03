@@ -298,16 +298,14 @@ class TestPresenceRoster(unittest.TestCase):
                 auth = self.cl.auth(self.jid.getNode(), self.password, self.jid.getResource(), sasl=1)
                 auth2 = self.cl2.auth(self.jid2.getNode(), self.password2, self.jid2.getResource(), sasl=1)
                 if auth and auth2:
-                    bot = PresenceBot(self.cl, self.jid2.getStripped())
+                    bot = PresenceBot(self.cl2, self.jid.getStripped())
                     self.cl.sendInitPresence()
+                    time.sleep(0.5)
                     self.cl.Dispatcher.Process()
                     self.cl2.sendInitPresence()
+                    time.sleep(0.5)
                     self.cl2.Dispatcher.Process()
-                    # self.assert_(self.jid2.getStripped() in bot.presencerecord)
-                    #import pprint
-                    #pprint.pprint(self.cl.Roster._data)
-                    #self.assert_(self.cl.Roster._data[self.jid2.getStripped()]['resources'].has_key(self.jid2.getResource()),
-                                 #"First JID's roster doesn't have the second JID marked as online")
+                    self.assert_(self.jid.getStripped() in bot.presencerecord)
                 else:
                     self.fail("Authentication failed")
             else:
@@ -408,11 +406,11 @@ class TestSubscriptions(unittest.TestCase):
                     self.cl2.Dispatcher.Process()
                     self.cl.Roster.Subscribe(self.jid2.getStripped())
                     self.cl.Roster.setItem(self.jid2.getStripped())
-                    time.sleep(0.1)
+                    time.sleep(0.2)
                     self.cl.Dispatcher.Process()
                     self.cl2.Dispatcher.Process()
                     self.cl2.Roster.Authorize(self.jid.getStripped())
-                    time.sleep(0.1)
+                    time.sleep(0.2)
                     self.cl.Dispatcher.Process()
                     self.cl2.Dispatcher.Process()
                     self.assert_(self.cl.Roster.getSubscription(self.jid2.getStripped()) == 'to')
@@ -424,6 +422,56 @@ class TestSubscriptions(unittest.TestCase):
         test = TestThread(run)
         test.start()
         test.join(WAITLEN)
+        if test.isAlive():
+            self.fail("Test took too long to execute")
+        if test.exc:
+            self.fail(test.exc)
+            
+    def testAddBoth(self):
+        """Tests positive path of subscriptions for both parties"""
+        def run():
+            con = self.cl.connect(use_srv=False)
+            con2 = self.cl2.connect(use_srv=False)
+            if con and con2:
+                auth = self.cl.auth(self.jid.getNode(), self.password, self.jid.getResource(), sasl=1)
+                auth2 = self.cl2.auth(self.jid2.getNode(), self.password2, self.jid2.getResource(), sasl=1)
+                if auth and auth2:
+                    self.cl.sendInitPresence()
+                    time.sleep(0.1)
+                    self.cl.Dispatcher.Process()
+                    self.cl2.sendInitPresence()
+                    time.sleep(0.1)
+                    self.cl2.Dispatcher.Process()
+                    self.cl.Roster.Subscribe(self.jid2.getStripped())
+                    self.cl.Roster.setItem(self.jid2.getStripped())
+                    time.sleep(0.1)
+                    self.cl.Dispatcher.Process()
+                    self.cl2.Dispatcher.Process()
+                    self.cl2.Roster.Authorize(self.jid.getStripped())
+                    time.sleep(0.1)
+                    self.cl.Dispatcher.Process()
+                    self.cl2.Dispatcher.Process()
+                    self.assert_(self.cl.Roster.getSubscription(self.jid2.getStripped()) == 'to')
+                    
+                    self.cl2.Roster.Subscribe(self.jid.getStripped())
+                    self.cl2.Roster.setItem(self.jid.getStripped())
+                    time.sleep(0.2)
+                    self.cl.Dispatcher.Process()
+                    self.cl2.Dispatcher.Process()
+                    self.cl.Roster.Authorize(self.jid2.getStripped())
+                    time.sleep(0.2)
+                    self.cl.Dispatcher.Process()
+                    self.cl2.Dispatcher.Process()
+                    #self.cl2.Roster.Authorize(self.jid.getStripped())
+                    self.assert_(self.cl.Roster.getSubscription(self.jid2.getStripped()) == 'both')
+                else:
+                    self.fail("Authentication failed")
+            else:
+                self.fail("Connections failed")
+
+        test = TestThread(run)
+        test.start()
+        test.join(WAITLEN*2)
         if test.isAlive():
             self.fail("Test took too long to execute")
         if test.exc:
