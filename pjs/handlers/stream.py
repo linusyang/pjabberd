@@ -88,6 +88,7 @@ class FeaturesPostAuthHandler(Handler):
     """Handler for outgoing features after authentication."""
     def handle(self, tree, msg, lastRetVal=None):
         res = u"<stream:features><bind xmlns='urn:ietf:params:xml:ns:xmpp-bind'/>" +\
+                "<session xmlns='urn:ietf:params:xml:ns:xmpp-session'/>" +\
                 "</stream:features>"
                 
         msg.addTextOutput(res)

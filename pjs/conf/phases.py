@@ -50,6 +50,21 @@ phases = {
                        'xpath' : "{jabber:client}iq[@type='set']/{urn:ietf:params:xml:ns:xmpp-bind}bind",
                        'handlers' : [h['iq-bind'], h['write']]
                        },
+          'iq-session' : {
+                          'description' : 'client binding a session',
+                          'xpath' : "{jabber:client}iq[@type='set']/{urn:ietf:params:xml:ns:xmpp-session}session",
+                          'handlers' : [h['iq-session'], h['write']]
+                          },
+          'iq-disco-items' : {
+                        'description' : 'discovery',
+                        'xpath' : "{jabber:client}iq[@type='get']/{http://jabber.org/protocol/disco#items}query",
+                        'handlers' : [h['iq-not-implemented'], h['write']]
+                        },
+          'iq-disco-info' : {
+                        'description' : 'server info',
+                        'xpath' : "{jabber:client}iq[@type='get']/{http://jabber.org/protocol/disco#info}query",
+                        'handlers' : [h['iq-not-implemented'], h['write']]
+                        },
           'message' : {
                        'description' : 'incoming message stanza',
                        'xpath' : '{jabber:client}message',

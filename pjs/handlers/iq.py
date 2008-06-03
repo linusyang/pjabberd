@@ -30,6 +30,19 @@ class IQBindHandler(Handler):
         else:
             # log it?
             pass
+        
+class IQSessionHandler(Handler):
+    """Handles session establishment"""
+    def handle(self, tree, msg, lastRetVal=None):
+        res = Element('iq', {
+                             'from' : msg.conn.server.hostname,
+                             'type' : 'result',
+                             'id' : tree[0].get('id')
+                             })
+        
+        msg.conn.data['user']['in-session'] = True
+        
+        return tostring(res)
 
 class IQNotImplementedHandler(Handler):
     """Handler that replies to unknown iq stanzas"""

@@ -81,7 +81,8 @@ class SASLAuthHandler(Handler):
         msg.conn.data['sasl']['complete'] = True
         msg.conn.data['user'] = {
                                  'jid' : '%s@%s' % (auth[1], msg.conn.server.hostname),
-                                 'resource' : ''
+                                 'resource' : '',
+                                 'in-session' : False
                                  }
         msg.addTextOutput(u"<success xmlns='urn:ietf:params:xml:ns:xmpp-sasl'/>")
         msg.conn.parser.resetParser()

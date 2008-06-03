@@ -53,5 +53,9 @@ handlers = {
             'iq-bind' : {
                          'handler' : pjs.handlers.iq.IQBindHandler,
                          'description' : 'handles resource binding'
-                         }
+                         },
+            'iq-session' : {
+                          'handler' : pjs.handlers.iq.IQSessionHandler,
+                          'description' : 'handles session binding'
+                          }
             }
