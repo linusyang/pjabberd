@@ -1,6 +1,8 @@
 import pjs.async.core as asyncore
 import pjs.parsers as parsers
 
+from tlslite.integration.TLSAsyncDispatcherMixIn import TLSAsyncDispatcherMixIn
+
 class Connection(asyncore.dispatcher_with_send):
     def __init__(self, sock, addr, server):
         asyncore.dispatcher_with_send.__init__(self, sock)
@@ -10,7 +12,28 @@ class Connection(asyncore.dispatcher_with_send):
         
         self.parser = parsers.borrow_parser(self)
         
-        # any sort of per-connection data. can be accessed by handlers
+        # any sort of per-connection data. can be accessed by handlers.
+        # right now:
+        # 'stream' : {
+        #              'in-stream' : True/False (False before <stream> sent and after </stream>),
+        #              'type' : 'client'/'server' (ie. c2s/s2s),
+        #              'id' : streamid (as str)
+        #            },
+        # 'sasl' : {
+        #            'mech' : 'PLAIN' / 'DIGEST-MD5',
+        #            'challenge' : str (last sasl challenge),
+        #            'stage' : int,
+        #            'complete' : True/False
+        #          },
+        # 'tls' : {
+        #           'complete' : True/False
+        #         }
+        # 'user' : {
+        #            'jid' : str (server-assigned jid),
+        #            'resource' : str (server-assigned resource),
+        #            'in-session' : True/False (True if <session> sent/accepted)
+        #          },
+        #
         self.data = {}
         
     def handle_expt(self):
