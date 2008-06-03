@@ -121,9 +121,9 @@ class NewS2SConnHandler(ThreadedHandler):
         
         def act():
             d = msg.conn.data
-            if not d.has_key('new-s2s-conn') or \
-                not d['new-s2s-conn'].has_key('hostname') or \
-                not d['new-s2s-conn'].has_key('ip'):
+            if 'new-s2s-conn' not in d or \
+                'hostname' not in d or \
+                'ip' not in d:
                 logging.warning("[NewS2SConnHandler] Invoked without necessary data in connection")
                 return
             

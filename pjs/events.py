@@ -196,7 +196,7 @@ def _runMessages():
     being processed for the same connection id.
     """
     for connId, msg in _processingQ:
-        if not _runningMessages.has_key(connId):
+        if connId not in _runningMessages:
             _runningMessages[connId] = msg
             msg.process()
 
@@ -209,7 +209,7 @@ def pickupResults():
     try:
         connId, out = resultQ.get_nowait()
         for server in activeServers:
-            if server.conns.has_key(connId):
+            if connId in server.conns:
                 conn = server.conns[connId][1]
                 conn.send(prepareDataForSending(out))
                 break
@@ -243,7 +243,7 @@ class _Dispatcher(object):
         phaseName = 'default'
         phase = self.phasesList[phaseName]
         
-        if knownPhase and self.phasesList.has_key(knownPhase):
+        if knownPhase and knownPhase in self.phasesList:
             phase = self.phasesList[knownPhase]
             phaseName = knownPhase
         else:
@@ -251,7 +251,7 @@ class _Dispatcher(object):
             # the stanza
             # FIXME: this is likely to be a bottleneck
             for p in self.phasesList:
-                if self.phasesList[p].has_key('xpath') and tree.find(self.phasesList[p]['xpath']) is not None:
+                if 'xpath' in self.phasesList[p] and tree.find(self.phasesList[p]['xpath']) is not None:
                     phase = self.phasesList[p]
                     phaseName = p
                     break
@@ -259,9 +259,9 @@ class _Dispatcher(object):
         # handlers get instantiated and loaded up into lists
         # TODO: watch for errors during instantiation
         # TODO: instantiate once, cache the handler and reuse
-        if phase.has_key('handlers'):
+        if 'handlers' in phase:
             handlers = [item['handler']() for item in phase['handlers']]
-            if phase.has_key('errorHandlers'):
+            if 'errorHandlers' in phase:
                 errorHandlers = [item['handler']() for item in phase['errorHandlers']]
             else:
                 errorHandlers = []
@@ -270,7 +270,7 @@ class _Dispatcher(object):
                 
         msg = Message(tree, conn, handlers, errorHandlers, phaseName)
         
-        if _runningMessages.has_key(conn.id):
+        if conn.id in _runningMessages:
             # already have a message being processed for this connection
             # so queue this one
             _processingQ.append((conn.id, msg))
@@ -281,7 +281,7 @@ class _Dispatcher(object):
             
     def getHandlerFunc(self, handlerName):
         """Gets a reference to the handler function"""
-        if h.has_key(handlerName):
+        if handlerName in h:
             return h[handlerName]['handler']
         else: return None
 

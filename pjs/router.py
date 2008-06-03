@@ -51,7 +51,7 @@ class Router:
             return False
 
         # do we have an existing connection to the domain?
-        if self.conns.has_key(jid.domain):
+        if jid.domain in self.conns:
             # reuse that connection
             self.conns[jid.domain][1].send(prepareDataForSending(data))
         else:
