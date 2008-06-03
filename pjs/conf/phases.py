@@ -119,6 +119,12 @@ _c2sStanzaPhases = {
                   'xpath' : '{jabber:client}presence',
                   'handlers' : [h['c2s-presence'], h['write']],
                   },
+    'c2s-presence-unavailable' : {
+              'description' : 'incoming unavailable presence stanza from client',
+              'xpath' : "{jabber:client}presence[@type='unavailable']",
+              'handlers' : [h['c2s-presence']],
+              'priority' : 1
+              },
     'subscription' : {
                       'description' : 'subscription handling',
                       'xpath' : "{jabber:client}presence[@type]",
@@ -156,6 +162,13 @@ _s2sStanzaPhases = {
                       'xpath' : "{jabber:server}presence[@type='unavailable']",
                       'handlers' : [h['s2s-presence'], h['write']],
                       'priority' : 2
-                      }
+                      },
+    's2s-presence-probe' : {
+                     'description' : 'incoming <presence type="probe"/> ' +\
+                                     'from other servers',
+                     'xpath' : "{jabber:server}presence[@type='probe']",
+                     'handlers' : [h['s2s-probe']],
+                     'priority' : 2
+                     }
     }
 s2sStanzaPhases = PrioritizedDict(_s2sStanzaPhases)

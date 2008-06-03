@@ -39,18 +39,19 @@ class ClientRouteHandler(Handler):
         try:
             to = getRoute(data, to)
         except Exception, e:
-            logging.warning("[%s] " + e, self.__class__)
+            logging.warning("[%s] %s", self.__class__, e)
             return
         
         try:
             jid = getJID(to)
         except Exception, e:
-            logging.warning("[%s] " + e, self.__class__)
+            logging.warning("[%s] %s" + e, self.__class__, e)
             return
         
         if jid.resource:
             # locate the resource of this JID
             def f(i):
+                if not conns[i][0]: return False
                 return conns[i][0] == jid
         else:
             # locate all active resources of this JID

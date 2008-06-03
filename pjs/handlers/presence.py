@@ -9,6 +9,9 @@ from pjs.roster import Roster, Subscription
 from pjs.jid import JID
 from copy import deepcopy
 
+# TODO: this class can be made into a regular Handler by introducing a
+# subscribers/subscriptions cache and updating it in a separate
+# ThreadedHandler (maybe for privacy lists)
 class C2SPresenceHandler(ThreadedHandler):
     """Handles plain <presence> (without type) sent by the clients"""
     def __init__(self):
@@ -23,28 +26,86 @@ class C2SPresenceHandler(ThreadedHandler):
         tpool = msg.conn.server.threadpool
         
         def act():
-            jid = msg.conn.data['user']['jid']
-            resource = msg.conn.data['user']['resource']
+            d = msg.conn.data
+            
+            retVal = lastRetVal
+            
+            jid = d['user']['jid']
+            resource = d['user']['resource']
+            
+            roster = Roster(jid)
             
             presTree = deepcopy(tree)
             presTree.set('from', '%s/%s' % (jid, resource))
             
+            probes = []
+            if tree.get('to') is None and not d['user']['active']:
+                # initial presence
+                # TODO: we don't need to do it every time. we can cache the
+                # data after the first resource is active and just resend
+                # that to all new resources
+                d['user']['active'] = True
+                
+                # get jids of the contacts whose status we're interested in
+                cjids = roster.getPresenceSubscriptions()
+                
+                probeTree = Element('presence', {
+                                                 'type': 'probe',
+                                                 'from' : '%s/%s' \
+                                                    % (jid, resource)
+                                                 })
+                
+                # TODO: replace this with a more efficient router handler
+                for cjid in cjids:
+                    probeTree.set('to', cjid)
+                    probeRouteData = {
+                                      'to' : cjid,
+                                      'data' : probeTree
+                                      }
+                    probes.append(probeRouteData)
+                    # they're sent first. see below
+                    
+                # broadcast to other resources of this user
+                resources = msg.conn.server.data['resources'][jid]
+                for r in resources:
+                    if r != resource:
+                        otherRes = jid + '/' + r
+                        presTree.set('to', otherRes)
+                        presRouteData = {
+                             'to' : otherRes,
+                             'data' : presTree
+                             }
+                        retVal = chainOutput(retVal, presRouteData)
+                        msg.setNextHandler('route-server')
+                
+            elif tree.get('to') is not None:
+                # TODO: directed presence
+                return
+            
+            # record this stanza as the last presence sent from this client
+            lastPresence = deepcopy(tree)
+            lastPresence.set('from', '%s/%s' % (jid, resource))
+            d['user']['lastPresence'] = lastPresence
+            
             # lookup contacts interested in presence
-            roster = Roster(jid)
             cjids = roster.getPresenceSubscribers()
             
-            retVal = lastRetVal
-            # TODO: replace this with another router phase that would send
+            # TODO: replace this with another router handler that would send
             # it out to all cjids in a batch instead of queuing a handler
             # for each
             for cjid in cjids:
                 presTree.set('to', cjid)
-                d = {
+                presRouteData = {
                      'to' : cjid,
                      'data' : presTree
                      }
-                retVal = chainOutput(retVal, d)
+                retVal = chainOutput(retVal, presRouteData)
                 msg.setNextHandler('route-server')
+                
+            # send the probes first
+            for probe in probes:
+                msg.setNextHandler('route-server')
+                retVal = chainOutput(retVal, probe)
                 
             return retVal
         
@@ -86,10 +147,42 @@ class S2SPresenceHandler(Handler):
         d = {
              'to' : tree.get('to'),
              'data' : tree,
-             'preprocessingFunc' : rewriteTo
+             'preprocessFunc' : rewriteTo
              }
         msg.setNextHandler('route-client')
         return chainOutput(lastRetVal, d)
+    
+class S2SProbeHandler(Handler):
+    """Handles <presence type="probe"/> sent by the servers"""
+    def handle(self, tree, msg, lastRetVal=None):
+        # find connections of the user's JID
+        try:
+            jid = JID(tree.get('to'))
+        except:
+            logging.debug("[%s] Couldn't create a JID from %s",
+                          self.__class__, tree.get('to'))
+            return
+        jids = msg.conn.server.launcher.getC2SServer().data['resources']
+        resources = jids.get(jid.getBare())
+        if not resources:
+            return
+        
+        lastPresences = []
+        for res, con in resources.items():
+            lp = con.data['user']['lastPresence']
+            if lp is not None:
+                lpcopy = deepcopy(lp) # keep the last presence intact
+                # modify the copy to include the 'to' attr for s2s routing
+                lpcopy.set('to', tree.get('from'))
+                lastPresences.append(lpcopy)
+                
+        if lastPresences:
+            d = {
+                 'to' : tree.get('from'),
+                 'data' : lastPresences,
+                 }
+            msg.setNextHandler('route-server')
+            return chainOutput(lastRetVal, d)
     
 class S2SSubscriptionHandler(ThreadedHandler):
     """Handles subscriptions sent from servers within <presence> stanzas.

@@ -109,6 +109,10 @@ handlers = {
                                   'handler' : pjs.handlers.presence.S2SSubscriptionHandler,
                                   'description' : 'subscriptions from servers'
                                   },
+            's2s-probe' : {
+                           'handler' : pjs.handlers.presence.S2SProbeHandler,
+                           'description' : 'handles <presence type="probe"/> from other servers'
+                           },
             'new-s2s-conn' : {
                               'handler' : pjs.handlers.stream.NewS2SConnHandler,
                               'description' : 'creates a new S2S connection and sends initial stream'

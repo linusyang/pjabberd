@@ -6,6 +6,7 @@ import socket
 from pjs.conf.phases import corePhases, c2sStanzaPhases, s2sStanzaPhases
 from pjs.conf.handlers import handlers as h
 from pjs.handlers.write import prepareDataForSending
+from pjs.utils import compact_traceback
 from Queue import Queue, Empty
 
 class Message:
@@ -119,6 +120,8 @@ class Message:
                 self._lastRetVal = ret
             self._gotException = False
         except Exception, e:
+            nil, t, v, tbinfo = compact_traceback()
+            logging.debug("Exception in in-process handler: %s: %s -- %s", t,v,tbinfo)
             self._gotException = True
             self._lastRetVal = e
     
@@ -181,7 +184,7 @@ class Message:
                 if eHandler:
                     self.errorHandlers.insert(0, eHandler())
                     
-    def queueHandler(self, handlerName, errorHandlerName=None):
+    def setLastHandler(self, handlerName, errorHandlerName=None):
         """Schedules 'handlerName' as the last handler to execute. Optionally,
         also schedules 'errorHandlerName' as the last error handler.
         """

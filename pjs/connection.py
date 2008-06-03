@@ -77,6 +77,9 @@ class ClientConnection(Connection):
                              'requestedRoster' : False, # True when sent the roster iq get
                                                         # when False, we shouldn't send it presence
                                                         # updates
+                             'active' : False, # active resource is an available resource
+                                               # that send an initial presence
+                             'lastPresence' : None # last <presence> stanza sent by client
                              }
         
         logging.info("[%s] New c2s connection accepted from %s",

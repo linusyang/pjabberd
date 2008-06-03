@@ -101,11 +101,7 @@ class SASLPlain:
         
         self.msg.conn.data['sasl']['complete'] = True
         self.msg.conn.data['sasl']['in-progress'] = False
-        self.msg.conn.data['user'] = {
-                                 'jid' : '%s@%s' % (auth[1], self.msg.conn.server.hostname),
-                                 'resource' : '',
-                                 'in-session' : False
-                                 }
+        self.msg.conn.data['user']['jid'] = '%s@%s' % (auth[1], self.msg.conn.server.hostname)
         
         # record the JID for local delivery
         self.msg.conn.server.conns[self.msg.conn.id] = (JID(self.msg.conn.data['user']['jid']),
@@ -252,12 +248,8 @@ class SASLDigestMD5:
                 self.state = SASLDigestMD5.INIT
                 d['sasl']['complete'] = True
                 d['sasl']['in-progress'] = False
-                d['user'] = {
-                             'jid' : '%s@%s' % (self.username,
-                                            self.msg.conn.server.hostname),
-                             'resource' : '',
-                             'in-session' : False
-                             }
+                d['user']['jid'] = '%s@%s' % (self.username,
+                                            self.msg.conn.server.hostname)
                 
                 # record the JID for local delivery
                 self.msg.conn.server.conns[self.msg.conn.id] = (JID(d['user']['jid']),
@@ -347,12 +339,7 @@ class IQAuthPlain:
         con.close()
         
         d = self.msg.conn.data
-        d['user'] = {
-                         'jid' : '%s@%s' % (username,
-                                           self.msg.conn.server.hostname),
-                         'resource' : '',
-                         'in-session' : False
-                         }
+        d['user']['jid'] = '%s@%s' % (username, self.msg.conn.server.hostname)
         # record the JID for local delivery
         self.msg.conn.server.conns[self.msg.conn.id] = (JID(d['user']['jid']),
                                                         self.msg.conn)
@@ -385,12 +372,8 @@ class IQAuthDigest:
         
         if hashtext == digest:
             d = self.msg.conn.data
-            d['user'] = {
-                         'jid' : '%s@%s' % (username,
-                                           self.msg.conn.server.hostname),
-                         'resource' : '',
-                         'in-session' : False
-                         }
+            d['user']['jid'] = '%s@%s' % (username,
+                                          self.msg.conn.server.hostname)
             
             # record the JID for local delivery
             self.msg.conn.server.conns[self.msg.conn.id] = (JID(d['user']['jid']),

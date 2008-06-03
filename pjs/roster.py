@@ -258,7 +258,7 @@ class Roster:
     
     def getPresenceSubscribers(self):
         """Returns a list of JIDs of contacts of this user who are interested
-        in the user's presence info.
+        in the user's presence info (from/both).
         """
         con = DBautocommit()
         c = con.cursor()
@@ -269,6 +269,29 @@ class Roster:
                        roster.subscription IN (?, ?, ?)",
                        (self.uid, Subscription.FROM,
                         Subscription.FROM_PENDING_OUT, Subscription.BOTH))
+        jids = []
+        res = c.fetchall()
+        for row in res:
+            jids.append(row[0])
+            
+        c.close()
+        con.close()
+        
+        return jids
+    
+    def getPresenceSubscriptions(self):
+        """Returns a list of JIDs of contacts of this user to whom the user
+        is subscribed (to/both).
+        """
+        con = DBautocommit()
+        c = con.cursor()
+        c.execute("SELECT jids.jid\
+                   FROM roster\
+                   JOIN jids ON jids.id = roster.contactid\
+                   WHERE roster.userid = ? AND\
+                       roster.subscription IN (?, ?, ?)",
+                       (self.uid, Subscription.TO,
+                        Subscription.TO_PENDING_IN, Subscription.BOTH))
         jids = []
         res = c.fetchall()
         for row in res:
