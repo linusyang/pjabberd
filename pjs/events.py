@@ -84,7 +84,7 @@ class Message:
             # run out of process with a callback to resume
             checkFunc, initFunc = nextHandler.handle(self.tree, self, self.lastRetVal)
             self.handlerResumeFunc = nextHandler.resume
-            self.conn.watch_function(checkFunc, initFunc, self.resume)
+            self.conn.watch_function(checkFunc, self.resume, initFunc)
             shouldReturn = True
         else:
             # log it

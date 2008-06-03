@@ -1,7 +1,13 @@
 import pjs.handlers.base
 import pjs.events
+import pjs.connection
+import pjs.threadpool
+from pjs.utils import FunctionCall
+from pjs.test.test_async import ServerHelper
 
 import unittest
+import socket
+import time
 
 class SimpleHandler(pjs.handlers.base.Handler):
     def __init__(self):
@@ -39,7 +45,7 @@ class ExceptionTrueHandler(pjs.handlers.base.Handler):
         else:
             return False
 
-class TestMessages(unittest.TestCase):
+class TestMessagesInProcess(unittest.TestCase):
     
     def setUp(self):
         unittest.TestCase.setUp(self)
@@ -116,5 +122,59 @@ class TestMessages(unittest.TestCase):
         
         self.assert_(not msg.lastRetVal)
         
+
+
+
+
+class SimpleThreadedHandler(pjs.handlers.base.ThreadedHandler):
+    def __init__(self, threadpool):
+        self.passed = False
+        self.threadpool = threadpool
+    def handle(self, tree, msg, lastRetVal=None):
+        def sleep(arg):
+            # time.sleep(10) # this also worked but slows down tests
+            return 'success'
+        def cb(workReq, retVal):
+            self.passed = retVal
+        req = pjs.threadpool.makeRequests(sleep, [({'arg' : 0}, None)], cb)
+        
+        def checkFunc():
+            return self.passed
+        
+        def initFunc():
+            [self.threadpool.putRequest(r) for r in req]
+        
+        return FunctionCall(checkFunc), FunctionCall(initFunc)
+    
+    def resume(self):
+        pass
+
+class TestMessageInThread(unittest.TestCase):
+    def setUp(self):
+        unittest.TestCase.setUp(self)
+        self.server = ServerHelper()
+        self.sock = socket.socket()
+        self.sock.connect(('', 44444))
+        self.conn = pjs.connection.Connection(self.sock, None, None)
+        self.threadpool = pjs.threadpool.ThreadPool(1)
+            
+    def tearDown(self):
+        unittest.TestCase.tearDown(self)
+        self.conn.handle_close()
+        self.server.handle_close()
+        self.threadpool.dismissWorkers(1)
+        del self.threadpool
+        
+    def testSimpleHandler(self):
+        h = SimpleThreadedHandler(self.threadpool)
+        
+        msg = pjs.events.Message(None, self.conn, [h], None, None)
+        msg.process()
+        
+        self.threadpool.wait()
+        time.sleep(0.5)
+        
+        self.assert_(h.passed)
+
 if __name__ == '__main__':
     unittest.main()
