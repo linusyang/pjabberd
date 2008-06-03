@@ -6,6 +6,7 @@ import pjs.handlers.stream
 import pjs.handlers.iq
 import pjs.handlers.sasl
 import pjs.handlers.presence
+import pjs.handlers.route
 
 # TODO: add functions to fetch handlers from the config file
 
@@ -103,5 +104,13 @@ handlers = {
             'new-s2s-conn' : {
                               'handler' : pjs.handlers.stream.NewS2SConnHandler,
                               'description' : 'creates a new S2S connection and sends initial stream'
-                              }
+                              },
+            'route-server' : {
+                              'handler' : pjs.handlers.route.ServerRouteHandler,
+                              'description' : 'routes data to a server'
+                              },
+            'route-client': {
+                             'handler' : pjs.handlers.route.ClientRouteHandler,
+                             'description' : 'routes data to a client on this server'
+                             }
             }

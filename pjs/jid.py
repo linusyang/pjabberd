@@ -29,3 +29,11 @@ class JID:
             return 0
         else:
             return -1
+        
+    def __str__(self):
+        out = self.domain
+        if self.node:
+            out = self.node + '@' + out
+        if self.resource:
+            out = out + '/' + self.resource
+        return out

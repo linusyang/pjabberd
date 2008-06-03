@@ -80,9 +80,9 @@ class IncrStreamParser:
         if data == "<presence to='dv@localhost' type='subscribe' from='tro@localhost'/>":
             logging.info("Parser about to eat S2S presence")
             
-        if self.conn.id.find('sin') != -1 or self.conn.id.find('sout') != -1:
-            self.seenSoFar += data
-            logging.debug("Parser for connection %s seen so far: %s", self.conn.id, self.seenSoFar)
+#        if self.conn.id.find('sin') != -1 or self.conn.id.find('sout') != -1:
+#            self.seenSoFar += data
+#            logging.debug("Parser for connection %s seen so far: %s", self.conn.id, self.seenSoFar)
         self._parser.Parse(data, 0)
         a = 1+1
 

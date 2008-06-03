@@ -115,7 +115,12 @@ class S2SSubscriptionHandler(ThreadedHandler):
 
             cinfo = roster.getContactInfo(cjid.getBare())
             subType = tree[0].get('type')
+            
+            retVal = lastRetVal
+
+            # S2S SUBSCRIBE
             if subType == 'subscribe':
+
                 if not cinfo:
                     # contact doesn't exist, so it's a first-time add
                     # need to add the contact with subscription None + Pending In
@@ -137,16 +142,33 @@ class S2SSubscriptionHandler(ThreadedHandler):
                 elif cinfo.subscription in (Subscription.FROM,
                                             Subscription.FROM_PENDING_OUT,
                                             Subscription.BOTH):
-                    # TODO: auto-reply with "subscribed" stanza
+                    # auto-reply with "subscribed" stanza
                     doRoute = False
                     out = "<presence to='%s' from='%s' type='subscribed'/>" % (cjid.getBare(), jid.getBare())
-                    msg.conn.server.launcher.router.routeToServer(msg, out, cjid.getBare())
+                    # prepare the data for routing
+                    subscribedRouting = {
+                         'to' : cjid.getBare(),
+                         'data' : out,
+                         }
+                    retVal = chainOutput(retVal, subscribedRouting)
+                    msg.setNextHandler('route-server')
+                
                 # ignore presence in other states
                 
                 if doRoute:
-                    # deliver the stanza
-                    msg.conn.server.launcher.router.routeToClient(msg, tree[0], jid)
+                    # queue the stanza for delivery
+                    stanzaRouting = {
+                                     'to' : jid,
+                                     'data' : tree[0]
+                                     }
+                    retVal = chainOutput(retVal, stanzaRouting)
+                    msg.setNextHandler('route-client')
+                    
+                return retVal
+
+            # S2S SUBSCRIBED
             elif subType == 'subscribed':
+
                 if cinfo:
                     subscription = cinfo.subscription
                     if cinfo.subscription in (Subscription.NONE_PENDING_OUT,
@@ -154,19 +176,22 @@ class S2SSubscriptionHandler(ThreadedHandler):
                                               Subscription.FROM_PENDING_OUT):
                         # change state
                         if cinfo.subscription == Subscription.NONE_PENDING_OUT:
-                            roster.updateContact(cjid.getBare(), None, None, Subscription.TO)
+                            roster.setSubscription(cinfo.id, Subscription.TO)
                             subscription = Subscription.TO
                         elif cinfo.subscription == Subscription.NONE_PENDING_IN_OUT:
-                            roster.updateContact(cjid.getBare(), None, None, Subscription.TO_PENDING_IN)
+                            roster.setSubscription(cinfo.id, Subscription.TO_PENDING_IN)
                             subscription = Subscription.TO_PENDING_IN
                         elif cinfo.subscription == Subscription.FROM_PENDING_OUT:
-                            roster.updateContact(cjid.getBare(), None, None, Subscription.BOTH)
+                            roster.setSubscription(cinfo.id, Subscription.BOTH)
                             subscription = Subscription.BOTH
                         
                         # forward the subscribed presence
-                        logging.debug("Forwarding subscribed presence to clients: %s",
-                                      tostring(tree[0]))
-                        msg.conn.server.launcher.router.routeToClient(msg, tree[0], jid)
+                        # prepare the presence data for routing
+                        d = {
+                             'to' : jid,
+                             'data' : tree[0],
+                             }
+                        retVal = chainOutput(retVal, d)
                             
                         # create an updated roster item for roster push
                         query = Roster.createRosterQuery(cinfo.jid,
@@ -179,14 +204,147 @@ class S2SSubscriptionHandler(ThreadedHandler):
                         if conns.has_key(bareJID):
                             routeData['jid'] = bareJID
                             routeData['resources'] = conns[bareJID]
+                        
+                        # next handlers (reverse order)
+                        msg.setNextHandler('route-client')
                         msg.setNextHandler('roster-push')
                         
-                        return chainOutput(lastRetVal, (routeData, query))
+                        return chainOutput(retVal, (routeData, query))
                         
+            # S2S UNSUBSCRIBE
             elif subType == 'unsubscribe':
-                pass
+
+                if cinfo:
+                    subscription = cinfo.subscription
+                    if subscription not in (Subscription.NONE,
+                                            Subscription.NONE_PENDING_OUT,
+                                            Subscription.TO):
+                        if subscription == Subscription.NONE_PENDING_IN \
+                          or subscription == Subscription.FROM:
+                            roster.setSubscription(cinfo.id, Subscription.NONE)
+                            subscription = Subscription.NONE
+                        elif subscription == Subscription.NONE_PENDING_IN_OUT \
+                          or subscription == Subscription.FROM_PENDING_OUT:
+                            roster.setSubscription(cinfo.id, Subscription.NONE_PENDING_OUT)
+                            subscription = Subscription.NONE_PENDING_OUT
+                        elif subscription == Subscription.TO_PENDING_IN \
+                          or subscription == Subscription.BOTH:
+                            roster.setSubscription(cinfo.id, Subscription.TO)
+                            subscription = Subscription.TO
+                            
+                        # these steps are really in reverse order due to handler queuing
+                        
+                        # send unavailable presence from all resources
+                        resources = msg.conn.server.launcher.getC2SServer().data['resources']
+                        bareJID = jid.getBare()
+                        jidForResources = resources.has_key(bareJID) and resources[bareJID]
+                        if jidForResources:
+                            out = u''
+                            #logging.debug("!!! jidForResources: %d", len(jidForResources))
+                            for i in jidForResources:
+                                out += "<presence from='%s/%s'" % (bareJID, i)
+                                out += " to='%s' type='unavailable'/>" % cjid.getBare()
+                            #logging.debug("!!! About to route %s", out)
+                            # and route it
+                            unavailableRouting = {
+                                                  'to' : cjid,
+                                                  'data' : out
+                                                  }
+                            retVal = chainOutput(retVal, unavailableRouting)
+                            # 4. route the unavailable presence back to server
+                            msg.setNextHandler('route-server')
+                            
+                        # auto-reply with "unsubscribed" stanza
+                        out = "<presence to='%s' from='%s' type='unsubscribed'/>" % (cjid.getBare(), jid.getBare())
+                        unsubscribedRouting = {
+                                               'to' : jid.getBare(),
+                                               'data' : out
+                                               }
+                        retVal = chainOutput(retVal, unsubscribedRouting)
+                        
+                        # prepare the unsubscribe presence data for routing to client
+                        unsubscribeRouting = {
+                             'to' : jid,
+                             'data' : tree[0],
+                             }
+                        retVal = chainOutput(retVal, unsubscribeRouting)
+                        
+                        # create an updated roster item for roster push
+                        # we should really create add an ask='subscribe' for
+                        # the NONE_PENDING_OUT state, but the spec doesn't
+                        # say anything about this, so leave it out for now.
+                        query = Roster.createRosterQuery(cinfo.jid,
+                                    Subscription.getPrimaryNameFromState(subscription),
+                                    cinfo.name, cinfo.groups)
+                        
+                        # needed for S2S roster push
+                        routeData = {}
+                        conns = msg.conn.server.launcher.getC2SServer().data['resources']
+                        bareJID = jid.getBare()
+                        if conns.has_key(bareJID):
+                            routeData['jid'] = bareJID
+                            routeData['resources'] = conns[bareJID]
+                        
+                        # handlers in reverse order. actual order:
+                        # 1. push the updated roster
+                        # 2. route the unsubscribe presence to client
+                        # 3. route the unsubscribed presence back to server
+                        # 4. see above. it's optional, since no resources could
+                        #    be online by this point
+                        msg.setNextHandler('route-server')
+                        msg.setNextHandler('route-client')
+                        msg.setNextHandler('roster-push')
+                        
+                        return chainOutput(retVal, (routeData, query))
+                        
+            # S2S UNSUBSCRIBED
             elif subType == 'unsubscribed':
-                pass
+
+                if cinfo:
+                    subscription = cinfo.subscription
+                    if subscription not in (Subscription.NONE,
+                                            Subscription.NONE_PENDING_IN,
+                                            Subscription.FROM):
+                        # change state
+                        if subscription == Subscription.NONE_PENDING_OUT \
+                          or subscription == Subscription.TO:
+                            roster.setSubscription(cinfo.id, Subscription.NONE)
+                            subscription = Subscription.NONE
+                        elif subscription == Subscription.NONE_PENDING_IN_OUT \
+                          or subscription == Subscription.TO_PENDING_IN:
+                            roster.setSubscription(cinfo.id, Subscription.NONE_PENDING_IN)
+                            subscription = Subscription.NONE_PENDING_IN
+                        elif subscription == Subscription.FROM_PENDING_OUT \
+                          or subscription == Subscription.BOTH:
+                            roster.setSubscription(cinfo.id, Subscription.FROM)
+                            subscription = Subscription.FROM
+                        
+                        # prepare the unsubscribed presence data for routing
+                        d = {
+                             'to' : jid,
+                             'data' : tree[0],
+                             }
+                        retVal = chainOutput(retVal, d)
+                        
+                        # create an updated roster item for roster push
+                        query = Roster.createRosterQuery(cinfo.jid,
+                                    Subscription.getPrimaryNameFromState(subscription),
+                                    cinfo.name, cinfo.groups)
+                        
+                        # needed for S2S roster push
+                        routeData = {}
+                        conns = msg.conn.server.launcher.getC2SServer().data['resources']
+                        bareJID = jid.getBare()
+                        if conns.has_key(bareJID):
+                            routeData['jid'] = bareJID
+                            routeData['resources'] = conns[bareJID]
+                        
+                        # handlers in reverse order
+                        # actually: push roster first, then route presence
+                        msg.setNextHandler('route-client')
+                        msg.setNextHandler('roster-push')
+                        
+                        return chainOutput(retVal, (routeData, query))
             
         def cb(workReq, retVal):
             self.done = True
@@ -243,7 +401,11 @@ class C2SSubscriptionHandler(ThreadedHandler):
             # get the RosterItem
             cinfo = roster.getContactInfo(cjid.getBare())
             
+            retVal = lastRetVal
+
+            # C2S SUBSCRIBE
             if type == 'subscribe':
+
                 # we must always route the subscribe presence so as to allow
                 # the other servers to resynchronize their sub lists.
                 # RFC 3921 9.2
@@ -281,20 +443,27 @@ class C2SSubscriptionHandler(ThreadedHandler):
                 treeCopy = deepcopy(tree[0])
                 treeCopy.set('from', jid)
                 
-                # route the presence
-                msg.conn.server.launcher.router.routeToServer(msg, treeCopy, cjid)
+                # prepare the presence data for routing
+                d = {
+                     'to' : cjid,
+                     'data' : treeCopy,
+                     }
+                retVal = chainOutput(retVal, d)
                 
+                # sequence of events in reverse order
                 # push the roster first, in case we have to create a new
                 # s2s connection
-                msg.setNextHandler('write')
+                msg.setNextHandler('route-server')
                 msg.setNextHandler('roster-push')
                 
-                return chainOutput(lastRetVal, query)
-                
+                return chainOutput(retVal, query)
+
+            # C2S SUBSCRIBED
             elif type == 'subscribed':
+
                 if not cinfo:
                     logging.warning("[%s] 'subscribed' presence received for " +\
-                                    "non-existant contact", self.__class__)
+                                    "non-existent contact %s", self.__class__, cjid)
                 else:
                     subscription = cinfo.subscription
                     if cinfo.subscription in (Subscription.NONE_PENDING_IN,
@@ -320,8 +489,7 @@ class C2SSubscriptionHandler(ThreadedHandler):
                         treeCopy = deepcopy(tree[0])
                         treeCopy.set('from', jid)
                         
-                        # route the presence
-                        msg.conn.server.launcher.router.routeToServer(msg, treeCopy, cjid)
+                        toRoute = tostring(treeCopy)
                         
                         # create available presence stanzas for all resources of the user
                         resources = msg.conn.server.launcher.getC2SServer().data['resources']
@@ -333,19 +501,147 @@ class C2SSubscriptionHandler(ThreadedHandler):
                                 out += "<presence from='%s/%s'" % (jid, i)
                                 out += " to='%s'/>" % cjid.getBare()
                             logging.debug("!!! About to route %s", out)
-                            # and route it
-                            msg.conn.server.launcher.router.routeToServer(msg, out, cjid)
+                            # and queue for routing
+                            toRoute += out
                         
-                        # queue the roster push
-                        msg.setNextHandler('write')
+                        # prepare the presence data for routing
+                        d = {
+                             'to' : cjid,
+                             'data' : toRoute,
+                             }
+                        retVal = chainOutput(retVal, d)
+                        
+                        # next handlers in reverse order
+                        msg.setNextHandler('route-server')
                         msg.setNextHandler('roster-push')
                         
-                        return chainOutput(lastRetVal, query)
-                    
+                        return chainOutput(retVal, query)
+
+            # C2S UNSUBSCRIBE
             elif type == 'unsubscribe':
-                pass
+
+                # we must always route the unsubscribe presence so as to allow
+                # the other servers to resynchronize their sub lists.
+                # RFC 3921 9.2
+                if not cinfo:
+                    # we don't have this contact in our roster, but route the
+                    # presence anyway
+                    # stamp presence with 'from'
+                    treeCopy = deepcopy(tree[0])
+                    treeCopy.set('from', jid)
+                    
+                    # prepare the presence data for routing
+                    d = {
+                         'to' : cjid,
+                         'data' : treeCopy,
+                         }
+                    msg.setNextHandler('route-server')
+                    
+                    return chainOutput(retVal, d)
+                else:
+                    subscription = cinfo.subscription
+                    if subscription == Subscription.BOTH: # mutual
+                        roster.setSubscription(cinfo.id, Subscription.FROM)
+                        subscription = Subscription.FROM
+                    elif subscription in (Subscription.NONE_PENDING_OUT, # one way
+                                          Subscription.NONE_PENDING_IN_OUT,
+                                          Subscription.TO,
+                                          Subscription.TO_PENDING_IN):
+                        if subscription == Subscription.NONE_PENDING_OUT \
+                          or subscription == Subscription.TO:
+                            roster.setSubscription(cinfo.id, Subscription.NONE)
+                            subscription = Subscription.NONE
+                        elif subscription == Subscription.NONE_PENDING_IN_OUT \
+                          or subscription == Subscription.TO_PENDING_IN:
+                            roster.setSubscription(cinfo.id, Subscription.NONE_PENDING_IN)
+                            subscription = Subscription.NONE_PENDING_IN
+                        
+                    # roster stanza
+                    query = Roster.createRosterQuery(cjid.getBare(),
+                                Subscription.getPrimaryNameFromState(subscription),
+                                cinfo.name, cinfo.groups)
+                    
+                    # stamp presence with 'from'
+                    treeCopy = deepcopy(tree[0])
+                    treeCopy.set('from', jid)
+                    
+                    # prepare the presence data for routing
+                    d = {
+                         'to' : cjid,
+                         'data' : treeCopy,
+                         }
+                    retVal = chainOutput(retVal, d)
+                    
+                    # schedules handlers in reverse order
+                    msg.setNextHandler('route-server')
+                    msg.setNextHandler('roster-push')
+                    
+                    return chainOutput(retVal, query)
+
+            # C2S UNSUBSCRIBED
             elif type == 'unsubscribed':
-                pass
+
+                if not cinfo:
+                    logging.warning("[%s] 'unsubscribed' presence received for " +\
+                                    "non-existent contact %s", self.__class__, cjid)
+                else:
+                    subscription = cinfo.subscription
+                    if subscription not in (Subscription.NONE,
+                                            Subscription.NONE_PENDING_OUT,
+                                            Subscription.TO):
+                        if subscription == Subscription.NONE_PENDING_IN \
+                          or subscription == Subscription.FROM:
+                            roster.setSubscription(cinfo.id, Subscription.NONE)
+                            subscription = Subscription.NONE
+                        elif subscription == Subscription.NONE_PENDING_IN_OUT \
+                          or subscription == Subscription.FROM_PENDING_OUT:
+                            roster.setSubscription(cinfo.id, Subscription.NONE_PENDING_OUT)
+                            subscription = Subscription.NONE
+                        elif subscription == Subscription.TO_PENDING_IN \
+                          or subscription == Subscription.BOTH:
+                            roster.setSubscription(cinfo.id, Subscription.TO)
+                            subscription = Subscription.TO
+                            
+                        # roster query
+                        if subscription == Subscription.NONE_PENDING_OUT:
+                            itemArgs = {'ask' : 'subscribe'}
+                        else:
+                            itemArgs = {}
+                        query = roster.createRosterQuery(cjid.getBare(),
+                                        Subscription.getPrimaryNameFromState(subscription),
+                                        cinfo.name, cinfo.groups, itemArgs)
+                    
+                        # stamp presence with 'from'
+                        treeCopy = deepcopy(tree[0])
+                        treeCopy.set('from', jid)
+                        
+                        toRoute = tostring(treeCopy)
+                        
+                        # create unavailable presence stanzas for all resources of the user
+                        resources = msg.conn.server.launcher.getC2SServer().data['resources']
+                        jidForResources = resources.has_key(jid) and resources[jid]
+                        if jidForResources:
+                            out = u''
+                            #logging.debug("!!! jidForResources: %d", len(jidForResources))
+                            for i in jidForResources:
+                                out += "<presence from='%s/%s'" % (jid, i)
+                                out += " to='%s' type='unavailable'/>" % cjid.getBare()
+                            #logging.debug("!!! About to route %s", out)
+                            # and add to output
+                            toRoute += out
+                        
+                        # prepare the presence data for routing
+                        d = {
+                             'to' : cjid,
+                             'data' : toRoute,
+                             }
+                        retVal = chainOutput(retVal, d)
+                        
+                        # handlers in reverse order
+                        msg.setNextHandler('route-server')
+                        msg.setNextHandler('roster-push')
+                        
+                        return chainOutput(retVal, query)
         
         def cb(workReq, retVal):
             self.done = True

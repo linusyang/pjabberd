@@ -112,7 +112,11 @@ class Message:
     def _execHandler(self, handler):
         """Run a handler in-process"""
         try:
-            self._lastRetVal = handler.handle(self.tree, self, self._lastRetVal)
+            ret = handler.handle(self.tree, self, self._lastRetVal)
+            
+            # keep the lastRetVal if the handler didn't return anything
+            if ret is not None:
+                self._lastRetVal = ret
             self._gotException = False
         except Exception, e:
             self._gotException = True

@@ -139,6 +139,13 @@ _s2sStanzaPhases = {
                       'description' : 'incoming presence from server',
                       'xpath' : "{jabber:server}presence",
                       'handlers' : [h['s2s-presence'], h['write']]
+                      },
+    's2s-presence-unavailable' : {
+                      'description' : 'incoming unavailable ' +\
+                                        'presence from server',
+                      'xpath' : "{jabber:server}presence[@type='unavailable']",
+                      'handlers' : [h['s2s-presence'], h['write']],
+                      'priority' : 2
                       }
     }
 s2sStanzaPhases = PrioritizedDict(_s2sStanzaPhases)

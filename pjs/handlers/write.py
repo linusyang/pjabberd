@@ -8,8 +8,9 @@ from pjs.utils import tostring
 
 class WriteHandler(Handler):
     def handle(self, tree, msg, lastRetVal=None):
-        """Attaches the lastRetVal to the message's buffer and sent it
-        all out. This only works with unicode strings for now.
+        """Walks through the lastRetVal list and sends to socket
+        all items that are either strings or Elements. Doesn't
+        modify lastRetVal.
         """
         out = msg.outputBuffer
         
@@ -40,7 +41,7 @@ def prepareDataForSending(lastRetVal):
             elif isinstance(item, unicode):
                 out += item
             else:
-                logging.warning("[prepareDataForSending] Attempting to " +\
+                logging.debug("[prepareDataForSending] Attempting to " +\
                                 "write an object of" +\
                                 " type %s to socket",
                                 type(item))

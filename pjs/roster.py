@@ -178,7 +178,9 @@ class Roster:
         if res:
             cid = res[0]
         else:
-            raise Exception, "No such contact in user's roster"
+            logging.info("[%s] Contact %s does not exist in roster of %s",
+                         self.__class__, cjid, self.jid)
+            return
         
         # delete the contact from all groups it's in for this user
         c.execute("DELETE FROM rostergroupitems\
@@ -290,9 +292,8 @@ class Roster:
                        JOIN jids AS userjids ON roster.userid = userjids.id\
                        JOIN jids AS contactjids ON roster.contactid = contactjids.id\
                    WHERE userjids.jid = ? AND\
-                       roster.subscription IN (?, ?, ?)",
-                       (self.jid, Subscription.TO,
-                        Subscription.TO_PENDING_IN, Subscription.BOTH))
+                       roster.subscription != ?",
+                       (self.jid, Subscription.NONE_PENDING_IN))
         
         self.items = {}
         for row in c:
