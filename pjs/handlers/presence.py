@@ -12,7 +12,9 @@ from copy import deepcopy
 # subscribers/subscriptions cache and updating it in a separate
 # ThreadedHandler (maybe for privacy lists)
 class C2SPresenceHandler(ThreadedHandler):
-    """Handles plain <presence> (without type) sent by the clients"""
+    """Handles plain <presence> (without type) and
+    <presence type="unavailable"> sent by the clients.
+    """
     def __init__(self):
         # this is true when the threaded handler returns
         self.done = False
@@ -72,6 +74,7 @@ class C2SPresenceHandler(ThreadedHandler):
                 return
             elif tree.get('type') == 'unavailable':
                 # broadcast to other resources of this user
+                d['user']['active'] = False
                 retVal = self.broadcastToOtherResources(presTree, msg, retVal, jid, resource)
             
             # record this stanza as the last presence sent from this client
@@ -89,7 +92,7 @@ class C2SPresenceHandler(ThreadedHandler):
                 presTree.set('to', cjid)
                 presRouteData = {
                      'to' : cjid,
-                     'data' : presTree
+                     'data' : deepcopy(presTree)
                      }
                 retVal = chainOutput(retVal, presRouteData)
                 msg.setNextHandler('route-server')
