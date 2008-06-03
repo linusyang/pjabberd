@@ -1,5 +1,6 @@
 import pjs.async.core
 import pjs.threadpool as threadpool
+import pjs.conf.conf
 import socket
 import logging
 import os, os.path, sys
@@ -11,7 +12,9 @@ from pjs.db import DB, sqlite
 class Server(dispatcher):
     def __init__(self, ip, port):
         dispatcher.__init__(self)
-        self.conns = []
+        # maintains a mapping of connection ids to connections
+        # {connId => Connection}
+        self.conns = {}
         self.ip = ip
         self.hostname = ip
         self.port = port
@@ -20,7 +23,7 @@ class Server(dispatcher):
         self.bind((ip, port))
         self.listen(5)
         
-        # see connection.LocalTriggerConnection.__doc__ 
+        # see connection.LocalTriggerConnection.__doc__
         self.localConn = LocalTriggerConnection(self.ip, self.port)
         
         def notifyFunc():
@@ -42,7 +45,7 @@ class Server(dispatcher):
     def handle_accept(self):
         sock, addr = self.accept()
         conn = Connection(sock, addr, self)
-        self.conns.append(conn)
+        self.conns[conn.id] = conn
         
     def handle_close(self):
         for c in self.conns:
@@ -113,6 +116,8 @@ if __name__ == '__main__':
     c.close()
     
     s = Server('localhost', 5222)
+    
+    pjs.conf.conf.server = s
     
     logging.info('server started')
     

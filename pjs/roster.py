@@ -29,11 +29,49 @@ class Roster:
             logging.warning("[roster] Adding a group %s to cid %d " + \
                             "failed because the cid doesn't exist in the roster",
                             group, contactId)
+            
+    def getContactInfo(self, cjid, includeGroups=True):
+        """Returns information about a contact with JID cjid in this user's
+        roster. Returns a RosterItem if the contact exists in the roster;
+        False otherwise.
+        If includeGroups is True, groups are added to the RosterItem as well.
+        """
+        c = DB().cursor()
+        
+        c.execute("SELECT contactid, name, subscription FROM roster\
+                   WHERE userid = ?", (self.uid,))
+        res = c.fetchone()
+        if res:
+            cid = res[0]
+            name = res[1]
+            sub = Subscription.getPrimaryNameFromState(res[2])
+        else:
+            c.close()
+            return False
+        
+        if includeGroups:
+            # get the groups
+            groups = []
+            c.execute("SELECT rgs.name\
+                       FROM rostergroups AS rgs\
+                           JOIN rostergroupitems AS rgi ON rgi.groupid = rgs.groupid\
+                       WHERE rgs.userid = ? AND rgi.contactid = ?", (self.uid, cid))
+            for group in c:
+                groups.append(group)
+                
+            return RosterItem(cjid, name, sub, groups, cid)
+        else:
+            return RosterItem(cjid, name, sub, id=cid)
     
     def updateContact(self, cjid, groups, name=None):
         """Adds or updates a contact in this user's roster. Returns the
         contact's id in the DB.
+        groups can be None, which means that all groups have been removed
+        or none need to be added.
         """
+        
+        groups = groups or []
+        
         c = DB().cursor()
         
         # check if this is an update to an existing roster entry
@@ -193,7 +231,13 @@ class Roster:
 
 class RosterItem:
     """Models the <item> element in a roster"""
-    def __init__(self, jid=None, name=None, subscription=None, groups=None):
+    def __init__(self, jid=None, name=None, subscription=None, groups=None, id=None):
+        """Creates a new RosterItem.
+        All attributes are optional and only the jid and subscription are
+        required for meaningful use in a roster send. id is the contact's id
+        in the database.
+        """
+        self.id = id
         self.jid = jid
         self.name = name
         self.subscription = subscription

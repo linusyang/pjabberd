@@ -11,6 +11,7 @@ class Connection(asyncore.dispatcher_with_send):
         self.sock = sock
         self.addr = addr
         self.server = server
+        self.id = id(self)
         
         self.parser = parsers.borrow_parser(self)
         
@@ -50,6 +51,7 @@ class Connection(asyncore.dispatcher_with_send):
         jid = self.data['user']['jid']
         resource = self.data['user']['resource']
         del self.server.data['resources'][jid][resource]
+        del self.server.conns[self.id]
         
         try:
             self.parser.close()

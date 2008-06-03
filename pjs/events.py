@@ -1,8 +1,11 @@
 import pjs.handlers.base
+import pjs.conf.conf
 import logging
 
 from pjs.conf.phases import corePhases, stanzaPhases
 from pjs.conf.handlers import handlers as h
+from pjs.handlers.write import prepareDataForSending
+from Queue import Queue, Empty
 
 class Message:
     def __init__(self, tree, conn, handlers, errorHandlers, currentPhase=None):
@@ -48,7 +51,10 @@ class Message:
         self.outputBuffer += unicode(data)
     
     def process(self):
-        """Runs the handlers"""
+        """Runs the handlers.
+        
+        Puts the contents of self.outputBuffer onto Dispatcher's resultQ
+        """
         
         # If we don't have error handlers, that's ok, but if we don't have
         # handlers, then we quit. Handlers are popped from the handlers list
@@ -78,6 +84,10 @@ class Message:
             
             if shouldReturn:
                 return
+        
+        # this signals to the dispatcher that the next message for this
+        # connection can now be processed
+        resultQ.put((self.conn.id, self.outputBuffer or None))
                 
     def resume(self):
         """Resumes the execution of handlers. This is the callback for when
@@ -162,12 +172,54 @@ class Message:
                 eHandler = Dispatcher().getHandlerFunc(errorHandlerName)
                 if eHandler:
                     self.errorHandlers.insert(0, eHandler())
+
+# Variables that the dispatchers share
+
+# Currently executing Messages for connection ids. Used to make sure
+# that we don't process Messages out of order.
+# connID => Message
+_runningMessages = {}
+
+# The queue of messages waiting to be processed. A message is queued if
+# there is another message for the same connection currently being
+# processed.
+# [(connId, Message), ...]
+_processingQ = []
+
+# When messages finish running, they leave the result on this queue.
+# out should be a string.
+# [(connId, out), ...]
+resultQ = Queue()
+
+def _runMessages():
+    """Runs all queued Messages that don't have an existing Message
+    being processed for the same connection id.
+    """
+    for connId, msg in _processingQ:
+        if not _runningMessages.has_key(connId):
+            _runningMessages[connId] = msg
+            msg.process()
+            
+def pickupResults():
+    """Picks up any available results on the result queue and calls
+    runMessages() to continue processing the queue.
+    """
+    try:
+        connId, out = resultQ.get_nowait()
+        conn = pjs.conf.conf.server.conns[connId]
+        conn.send(prepareDataForSending(out))
+        del _runningMessages[connId]
+    except Empty:
+        pass
+    
+    _runMessages()
     
 class _Dispatcher(object):
     """Dispatches events in a phase to Messages for handling. This class
     uses the Singleton pattern.
     """
     def __init__(self):
+        # which phase list do we scan?
         self.phasesList = corePhases
     
     def dispatch(self, tree, conn, knownPhase=None):
@@ -207,8 +259,16 @@ class _Dispatcher(object):
             return
                 
         msg = Message(tree, conn, handlers, errorHandlers, phaseName)
-        msg.process()
-    
+        
+        if _runningMessages.has_key(conn.id):
+            # already have a message being processed for this connection
+            # so queue this one
+            _processingQ.append((conn.id, msg))
+        else:
+            # record it and run it
+            _runningMessages[conn.id] = msg
+            msg.process()
+            
     def getHandlerFunc(self, handlerName):
         """Gets a reference to the handler function"""
         if h.has_key(handlerName):

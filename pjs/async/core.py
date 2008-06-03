@@ -52,6 +52,7 @@ import sys
 import time
 
 import pjs.utils
+import pjs.events
 
 import os
 from errno import EALREADY, EINPROGRESS, EWOULDBLOCK, ECONNRESET, \
@@ -66,7 +67,7 @@ try:
     func_map # dictionary of FunctionCall => callback
 except NameError:
     func_map = {}
-
+    
 class ExitNow(Exception):
     pass
 
@@ -152,6 +153,9 @@ def poll(timeout=0.0, map=None):
         
     if func_map:
         funcCheck()
+        
+    # pick up results from Messages and process queued
+    pjs.events.pickupResults()
 
 def poll2(timeout=0.0, map=None):
     # Use the poll() support added to the select module in Python 2.0
@@ -187,6 +191,9 @@ def poll2(timeout=0.0, map=None):
             
     if func_map:
         funcCheck()
+        
+    # pick up results from Messages and process queued
+    pjs.events.pickupResults()
 
 poll3 = poll2                           # Alias for backward compatibility
 
@@ -206,7 +213,7 @@ def funcCheck():
         if ret:
             cb()
             del func_map[f]
-
+            
 def loop(timeout=30.0, use_poll=False, map=None, count=None):
     if map is None:
         map = socket_map
