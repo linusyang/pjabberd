@@ -105,6 +105,7 @@ class IncrStreamParser:
         except Exception, e:
             logging.warning("[%s] Parser died with %s",
                             self.__class__, e)
+            # TODO: complain about invalid XML and close connection
             
         if self._exception:
             # the parser found quirky input

@@ -1,3 +1,4 @@
+import pjs.test.init # init the launcher
 import pjs.handlers.base
 import pjs.events
 import pjs.connection
@@ -46,23 +47,28 @@ class ExceptionTrueHandler(pjs.handlers.base.Handler):
             return False
 
 class TestMessagesInProcess(unittest.TestCase):
+    class FakeConn:
+        def __init__(self):
+            self.id = 5
     
     def setUp(self):
         unittest.TestCase.setUp(self)
+        self.conn = TestMessagesInProcess.FakeConn()
     
     def tearDown(self):
         unittest.TestCase.tearDown(self)
+        pjs.queues.resultQ.empty()
         
     def testSimpleInProcess(self):
         h = SimpleHandler()
-        msg = pjs.events.Message(None, None, [h], None, None)
+        msg = pjs.events.Message(None, self.conn, [h], None, None)
         msg.process()
         
         self.assert_(h.prop)
         
     def testSimpleWithExceptionInProcess(self):
         h = SimpleHandlerWithError()
-        msg = pjs.events.Message(None, None, [h], None, None)
+        msg = pjs.events.Message(None, self.conn, [h], None, None)
         msg.process()
         
         self.assert_(isinstance(msg._lastRetVal, Exception))
@@ -70,14 +76,14 @@ class TestMessagesInProcess(unittest.TestCase):
     def testSimpleWithBothInProcess(self):
         h1 = SimpleHandlerWithError()
         h2 = SimpleHandler()
-        msg = pjs.events.Message(None, None, [h1], [h2], None)
+        msg = pjs.events.Message(None, self.conn, [h1], [h2], None)
         msg.process()
         
         self.assert_(h2.prop)
         
     def testChainedInProcess(self):
         h1 = SimpleHandler()
-        msg = pjs.events.Message(None, None, [h1, h1], None, None)
+        msg = pjs.events.Message(None, self.conn, [h1, h1], None, None)
         msg.process()
         
         self.assert_(not h1.prop)
@@ -85,7 +91,7 @@ class TestMessagesInProcess(unittest.TestCase):
     def testChainedWithExceptionInProcess(self):
         h1 = SimpleHandler()
         h2 = SimpleHandlerWithError()
-        msg = pjs.events.Message(None, None, [h1, h2], None, None)
+        msg = pjs.events.Message(None, self.conn, [h1, h2], None, None)
         msg.process()
         
         self.assert_(isinstance(msg._lastRetVal, Exception))
@@ -93,13 +99,13 @@ class TestMessagesInProcess(unittest.TestCase):
     def testChainedWithReturnValuePassingInProcess(self):
         h1 = ReturnTrueHandler()
         h2 = ReturnValueDependentHandler()
-        msg = pjs.events.Message(None, None, [h1, h2], None, None)
+        msg = pjs.events.Message(None, self.conn, [h1, h2], None, None)
         msg.process()
         
         self.assert_(msg._lastRetVal == 'success')
         
         h1 = SimpleHandler()
-        msg = pjs.events.Message(None, None, [h1, h2], None, None)
+        msg = pjs.events.Message(None, self.conn, [h1, h2], None, None)
         msg.process()
         
         self.assert_(not msg._lastRetVal)
@@ -108,7 +114,7 @@ class TestMessagesInProcess(unittest.TestCase):
         h1 = SimpleHandlerWithError()
         h2 = ExceptionTrueHandler()
         
-        msg = pjs.events.Message(None, None, [h1], [h2], None)
+        msg = pjs.events.Message(None, self.conn, [h1], [h2], None)
         msg.process()
         
         self.assert_(msg._lastRetVal == 'success')
@@ -117,7 +123,7 @@ class TestMessagesInProcess(unittest.TestCase):
         h1 = SimpleHandlerWithError()
         h2 = ExceptionTrueHandler()
         
-        msg = pjs.events.Message(None, None, [h1, h2], [h2], None)
+        msg = pjs.events.Message(None, self.conn, [h1, h2], [h2], None)
         msg.process()
         
         self.assert_(not msg._lastRetVal)
@@ -159,7 +165,8 @@ class TestMessageInThread(unittest.TestCase):
         self.server = ServerHelper()
         self.sock = socket.socket()
         self.sock.connect(('', 44444))
-        self.conn = pjs.connection.Connection(self.sock, None, None)
+        self.conn = pjs.connection.Connection(self.sock, None, self.server)
+        self.server.conns[self.conn.id] = ()
         self.threadpool = pjs.threadpool.ThreadPool(1)
             
     def tearDown(self):

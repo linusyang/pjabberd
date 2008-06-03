@@ -52,7 +52,7 @@ import sys
 import time
 
 import pjs.utils
-import pjs.events
+import pjs.queues
 
 import os
 from errno import EALREADY, EINPROGRESS, EWOULDBLOCK, ECONNRESET, \
@@ -110,7 +110,7 @@ def readwrite(obj, flags):
 
 def poll(timeout=0.0, map=None):
     # pick up results from Messages and process queued
-    pjs.events.pickupResults()
+    pjs.queues.pickupResults()
     
     if map is None:
         map = socket_map
@@ -185,7 +185,7 @@ def poll2(timeout=0.0, map=None):
             r = []
             
         # pick up results from Messages and process queued
-        pjs.events.pickupResults()
+        pjs.queues.pickupResults()
         
         for fd, flags in r:
             obj = map.get(fd)

@@ -1,5 +1,7 @@
+import pjs.test.init # init the launcher
 import pjs.async.core as asyncore
 from pjs.utils import FunctionCall
+from pjs.connection import Connection
 
 import unittest
 import socket
@@ -14,8 +16,13 @@ class ServerHelper(asyncore.dispatcher):
         self.bind(('', 44444))
         self.listen(5)
         
+        self.conns = {}
+        
     def handle_accept(self):
-        conn, addr = self.accept()
+        sock, addr = self.accept()
+        conn = Connection(sock, addr, self)
+        # we don't know the JID until client logs in
+        self.conns[conn.id] = (None, conn)
         
     def handle_close(self):
         self.close()

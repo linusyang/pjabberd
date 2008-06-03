@@ -1,7 +1,5 @@
 import logging
 import socket
-import pjs.conf.conf
-import pjs.server
 import pjs.threadpool as threadpool
 
 from pjs.handlers.base import Handler, ThreadedHandler, chainOutput, poll

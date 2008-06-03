@@ -1,5 +1,5 @@
 import pjs.async.core as asyncore
-import pjs.parsers as parsers
+import pjs.parsers
 import logging
 import socket
 
@@ -16,7 +16,7 @@ class Connection(asyncore.dispatcher_with_send):
         self.server = server
         self.id = id(self)
         
-        self.parser = parsers.borrow_parser(self)
+        self.parser = pjs.parsers.borrow_parser(self)
         
         # per-connection data. can be accessed by handlers.
         self.data = {}
@@ -255,7 +255,6 @@ class LocalTriggerConnection(asyncore.dispatcher_with_send):
                         "trigger socket", self.__class__, self.addr)
     
     def handle_close(self):
-        del self.server.conns[self.id]
         self.close()
         
     def handle_read(self): pass

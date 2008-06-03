@@ -2,12 +2,15 @@ import unittest
 import copy
 import xml.parsers.expat
 import pjs.conf.handlers as handlers
+import pjs.test.init # it initializes the launcher
+import pjs.conf.conf
 from pjs.parsers import IncrStreamParser
 from pjs.handlers.base import Handler
+from pjs.elementtree.ElementTree import Element
 
 streamStart = """<stream:stream xmlns='jabber:client' \
             xmlns:stream='http://etherx.jabber.org/streams' \
-            id='c2s_345' from='example.com' version='1.0'>"""
+            id='c2s_345' from='localhost' version='1.0'>"""
 streamEnd = '</stream:stream>'
 
 class DumbParser(IncrStreamParser):
@@ -75,13 +78,12 @@ class TestDumbParser(unittest.TestCase):
 class TestParser(unittest.TestCase):
     """Test tree-building of the incremental parser"""
 
-    # these are tested in some cases
-    stream = None
-    tree = None
-    
     def setUp(self):
         unittest.TestCase.setUp(self)
         self.p = IncrStreamParser()
+        
+        pjs.conf.conf.launcher.run()
+        
         self.oldhandlers = copy.deepcopy(handlers.handlers)
         
         def saveData(tree, msg, lastRetVal):
@@ -98,11 +100,13 @@ class TestParser(unittest.TestCase):
         unittest.TestCase.tearDown(self)
         
         try:
-            self.p.close() 
+            self.p.close()
         except xml.parsers.expat.ExpatError:
             pass
         
         handlers.handlers = self.oldhandlers
+        
+        pjs.conf.conf.launcher.stop()
         
     def testOpenStream(self):
         """Depth should increase at stream element"""
@@ -116,15 +120,6 @@ class TestParser(unittest.TestCase):
         self.p.feed(streamEnd)
         self.assert_(self.p.depth == 0)
         self.assert_(self.p.tree is None)
-        
-    def testKeepStream(self):
-        """Should keep the <stream> Element even when we've received </stream>.
-        This is so that any threaded handlers can use it.
-        """
-        self.p.feed(streamStart)
-        self.p.feed(streamEnd)
-        
-        self.assert_(TestParser.stream is not None)
         
     def testSimpleStanza(self):
         """Single-level empty stanza"""
@@ -152,17 +147,16 @@ class TestParser(unittest.TestCase):
         self.p.feed("</jid></bind></iq>")
         self.assert_(self.p.depth == 1)
         self.assert_(self.p.tree.tag == '{jabber:client}iq')
-        self.assert_(self.p.tree.tag == '{urn:ietf:params:xml:ns:xmpp-bind}bind')
-        self.assert_(self.p.tree[0].text == u'somenode@example.com/someresource')
+        self.assert_(self.p.tree[0].tag == '{urn:ietf:params:xml:ns:xmpp-bind}bind')
+        self.assert_(self.p.tree[0][0].text == u'somenode@example.com/someresource')
 
     def testNamespacedXPath(self):
         """Should be able to refer to elements using namespaces in XPath"""
         self.p.feed(streamStart)
         self.p.feed('<stream:features></stream:features>')
-        self.p.feed(streamEnd)
         
-        stream = copy.deepcopy(TestParser.stream)
-        stream.insert(0, TestParser.tree)
+        stream = Element('dummy')
+        stream.insert(0, self.p.tree)
         
         self.assert_(stream.find('{http://etherx.jabber.org/streams}features') is not None)
         

@@ -37,6 +37,11 @@ class PJSLauncher:
         self._c2s.createThreadpool(5, notifyFunc)
         self._s2s.createThreadpool(5, notifyFunc)
         
+    def stop(self):
+        self.triggerConn.handle_close()
+        self._c2s.handle_close()
+        self._s2s.handle_close()
+        
     def getC2SServer(self):
         return self._c2s
     def getS2SServer(self):
