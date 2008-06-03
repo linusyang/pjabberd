@@ -1,3 +1,5 @@
+import logging
+
 from pjs.handlers.base import Handler
 from pjs.utils import generateId
 
@@ -14,7 +16,7 @@ class StreamInitHandler(Handler):
             streamType = 'server'
         else:
             # TODO: send <bad-namespace-prefix/>
-            # log it
+            logging.warning("Unknown stream namespace: %s", ns)
             return
         
         # TODO: version check

@@ -1,3 +1,5 @@
+import logging
+
 from pjs.handlers.base import Handler
 from pjs.elementtree.ElementTree import Element, SubElement
 from pjs.utils import tostring, generateId
@@ -28,8 +30,7 @@ class IQBindHandler(Handler):
             
             return tostring(res)
         else:
-            # log it?
-            pass
+            logging.warning("No id in <iq>:\n%s", tostring(iq))
         
 class IQSessionHandler(Handler):
     """Handles session establishment"""
@@ -51,7 +52,7 @@ class IQNotImplementedHandler(Handler):
             # get the original iq msg
             origIQ = tree[0]
         else:
-            # log it
+            logging.warning("Original <iq> missing:\n%s", tostring(tree))
             return
         
         id = origIQ.get('id')
@@ -70,5 +71,4 @@ class IQNotImplementedHandler(Handler):
             
             return tostring(res)
         else:
-            # log it?
-            pass
+            logging.warning("No id in <iq>:\n%s", tostring(origIQ))

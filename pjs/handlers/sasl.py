@@ -2,11 +2,13 @@
 # Some parts are borrowed from twisted. See TWISTED-LICENSE for details on its
 # license.
 
+import pjs.sasl_mechanisms as mechs
+import re
+import logging
+
 from pjs.handlers.base import Handler
 from pjs.db import db
 from pjs.elementtree.ElementTree import Element, SubElement, tostring
-import pjs.sasl_mechanisms as mechs
-import re
 
 try:
     # Python >= 2.4
@@ -40,7 +42,7 @@ def fromBase64(s):
 class SASLAuthHandler(Handler):
     """Handles SASL's <auth> element sent from the other side."""
     def handle(self, tree, msg, lastRetVal=None):
-        mech = tree[0].get('mechanism', 'PLAIN')
+        mech = tree[0].get('mechanism')
         
         if not msg.conn.data.has_key('sasl'):
             msg.conn.data['sasl'] = {
@@ -75,7 +77,7 @@ class SASLAuthHandler(Handler):
             # TODO: implement digest
             msg.conn.data['sasl']['mech'] = 'DIGEST-MD5'
         else:
-            # log it
+            logging.warning("Mechanism %s not implemented", mech)
             return
         
         msg.conn.data['sasl']['complete'] = True
@@ -95,7 +97,7 @@ class SASLErrorHandler(Handler):
             
             msg.addTextOutput(tostring(el))
         else:
-            # log it
+            logging.warning("SASLErrorHandler was passed a non-SASL exception")
             raise Exception, "can't handle a non-SASL error"
     
 class SASLError(Exception):

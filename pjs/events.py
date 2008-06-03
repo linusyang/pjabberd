@@ -1,4 +1,6 @@
 import pjs.handlers.base
+import logging
+
 from pjs.conf.phases import corePhases, stanzaPhases
 from pjs.conf.handlers import handlers as h
 
@@ -100,8 +102,7 @@ class Message:
             self.conn.watch_function(checkFunc, self.resume, initFunc)
             shouldReturn = True
         else:
-            # log it
-            pass
+            logging.warning("Unknown handler type for %s. Type: %s", nextHandler, type(nextHandler))
         
         return shouldReturn
     

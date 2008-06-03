@@ -1,5 +1,6 @@
 import pjs.async.core as asyncore
 import pjs.parsers as parsers
+import logging
 
 from tlslite.integration.TLSAsyncDispatcherMixIn import TLSAsyncDispatcherMixIn
 
@@ -36,6 +37,8 @@ class Connection(asyncore.dispatcher_with_send):
         #
         self.data = {}
         
+        logging.info("New connection accepted from %s", self.addr)
+        
     def handle_expt(self):
         # log it
         pass
@@ -44,7 +47,6 @@ class Connection(asyncore.dispatcher_with_send):
         try:
             self.parser.close()
         except:
-            # log it
             pass
         self.parser.resetStream()
         self.close()

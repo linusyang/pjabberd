@@ -1,4 +1,4 @@
-import pjs.async.asyncore as async
+import pjs.async.core as async
 #import asyncore as async
 from pjs.utils import FunctionCall
 import socket

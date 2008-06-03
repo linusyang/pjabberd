@@ -1,7 +1,10 @@
-from pjs.connection import Connection
-from pjs.async.core import dispatcher
 import pjs.async.core
 import socket
+import logging
+import os, os.path, sys
+
+from pjs.connection import Connection
+from pjs.async.core import dispatcher
 from pjs.db import db
 
 class Server(dispatcher):
@@ -27,7 +30,34 @@ class Server(dispatcher):
         self.close()
         
 if __name__ == '__main__':
+
+    logFileName = 'server-log'
+    logDir = 'log'
+    logLoc = os.path.join(logDir, logFileName)
+    logLevel = logging.DEBUG
     
+    def configLogging(filename=logFileName, level=logLevel,
+                     format='%(asctime)s %(levelname)-8s %(message)s'):
+        try:
+            logging.basicConfig(filename=filename, level=level, format=format)
+        except IOError:
+            print >> sys.stderr, 'Could not create a log file. Logging to stderr.'
+            logging.basicConfig(level=level, format=format)
+    
+    if os.path.exists('log'):
+        if os.path.isdir('log') and os.access('log', os.W_OK):
+            configLogging(logLoc)
+        else:
+            print >> sys.stderr, 'Logging directory is not accessible'
+            configLogging()
+    else:
+        try:
+            os.mkdir('log')
+            configLogging(logLoc)
+        except IOError:
+            print >> sys.stderr, 'Could not create logging directory'
+            configLogging()
+        
     c = db.cursor()
     c.execute("CREATE TABLE users (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,\
                                    jid TEXT NOT NULL,\
@@ -38,4 +68,11 @@ if __name__ == '__main__':
     c.close()
     
     s = Server('localhost', 5222)
-    pjs.async.core.loop()
+    
+    logging.info('server started')
+    
+    try:
+        pjs.async.core.loop()
+    except KeyboardInterrupt:
+        # clean up
+        logging.shutdown()
