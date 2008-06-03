@@ -11,8 +11,12 @@ phases = {
                        },
           'stream-init' : {
                            'description' : 'initializes stream data and sends out features',
-                           'handlers' : [h['stream-init'], h['features-out'], h['write']]
+                           'handlers' : [h['stream-init'], h['features-init'], h['write']]
                            },
+          'stream-reinit' : {
+                             'description' : 'new stream where one already exists',
+                             'handlers' : [h['stream-reinit']]
+                             },
           'features' : {
                         'description' : 'stream features such as TLS and resource binding',
                         'xpath' : '{http://etherx.jabber.org/streams}features',
@@ -21,22 +25,21 @@ phases = {
           'sasl-auth' : {
                          'description' : 'SASL\'s <auth>',
                          'xpath' : '{urn:ietf:params:xml:ns:xmpp-sasl}auth',
-                         'handlers' : [h['sasl-auth'], h['write']]
+                         'handlers' : [h['sasl-auth'], h['write']],
+                         'errorHandlers' : [h['sasl-error']]
                          },
           'sasl-response' : {
                              'description' : 'SASL client\'s response to challenge',
                              'xpath' : '{urn:ietf:params:xml:ns:xmpp-sasl}response',
-                             'handlers' : []
+                             'handlers' : [],
+                             'errorHandlers' : [h['sasl-error']]
                              },
           'sasl-abort' : {
                           'description' : 'initiating entity aborts auth',
                           'xpath' : '{urn:ietf:params:xml:ns:xmpp-sasl}abort',
-                          'handlers' : []
+                          'handlers' : [],
+                          'errorHandlers' : [h['sasl-error']]
                           },
-          'stream-reinit' : {
-                             'description' : 'new stream where one already exists',
-                             'handlers' : []
-                             },
           'iq' : {
                   'description' : 'incoming IQ stanza',
                   'xpath' : '{jabber:client}iq',

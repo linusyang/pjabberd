@@ -4,7 +4,7 @@
 
 from pjs.handlers.base import Handler
 from pjs.db import db
-from pjs.elementtree.ElementTree import Element
+from pjs.elementtree.ElementTree import Element, SubElement, tostring
 import pjs.sasl_mechanisms as mechs
 import re
 
@@ -38,9 +38,7 @@ def fromBase64(s):
     return b64decode(s) # could raise an exception if cannot decode
 
 class SASLAuthHandler(Handler):
-    def __init__(self):
-        pass
-    
+    """Handles SASL's <auth> element sent from the other side."""
     def handle(self, tree, msg, lastRetVal=None):
         mech = tree[0].get('mechanism', 'PLAIN')
         
@@ -60,28 +58,59 @@ class SASLAuthHandler(Handler):
                 try:
                     authtext = fromBase64(authtext64)
                 except:
-                    # TODO: raise exception or chain an error-handler
-                    pass
+                    raise SASLIncorrectEncodingError
                 
                 auth = authtext.split('\x00')
                 
                 if len(auth) != 3:
-                    # TODO: raise exception or chain an error handler
-                    pass
+                    raise SASLIncorrectEncodingError
                 
                 c = db.cursor()
                 c.execute("SELECT * FROM users WHERE \
                     username = ? AND password = ?", (auth[1], auth[2]))
                 res = c.fetchall()
                 if len(res) == 0:
-                    # TODO: denied. raise exception or chain an error handler
-                    pass
+                    raise SASLAuthError
                 else:
+                    msg.conn.data['sasl']['complete'] = True
                     msg.addTextOutput(u"<success xmlns='urn:ietf:params:xml:ns:xmpp-sasl'/>")
+                    msg.conn.parser.resetParser()
         elif mech == 'DIGEST-MD5':
+            # TODO: implement digest
             msg.conn.data['sasl']['mech'] = 'DIGEST-MD5'
         else:
             # log it
             return
         
-        
+class SASLErrorHandler(Handler):
+    def handle(self, tree, msg, lastRetVal=None):
+        if isinstance(lastRetVal, SASLError):
+            el = Element('failure', {'xmlns' : 'urn:ietf:params:xml:ns:xmpp-sasl'})
+            el.append(lastRetVal.errorElement())
+            
+            msg.addTextOutput(tostring(el))
+        else:
+            # log it
+            raise Exception, "can't handle a non-SASL error"
+    
+class SASLError(Exception):
+    def errorElement(self):
+        raise NotImplementedError, 'must be overridden in a subclass'
+class SASLIncorrectEncodingError(SASLError):
+    def errorElement(self):
+        return Element('incorrect-encoding')
+class SASLInvalidAuthzError(SASLError):
+    def errorElement(self):
+        return Element('invalid-authzid')
+class SASLInvalidMechanismError(SASLError):
+    def errorElement(self):
+        return Element('invalid-mechanism')
+class SASLMechanismTooWeakError(SASLError):
+    def errorElement(self):
+        return Element('mechanism-too-weak')
+class SASLAuthError(SASLError):
+    def errorElement(self):
+        return Element('not-authorized')
+class SASLTempAuthError(SASLError):
+    def errorElement(self):
+        return Element('temporary-auth-failure')

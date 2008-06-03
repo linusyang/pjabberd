@@ -3,9 +3,6 @@ from pjs.handlers.base import Handler
 #TODO: do we need a handler for arbitrary binary data?
 
 class WriteHandler(Handler):
-    def __init__(self):
-        pass
-    
     def handle(self, tree, msg, lastRetVal=None):
         """Attaches the lastRetVal to the message's buffer and sent it
         all out. This only works with unicode strings for now.

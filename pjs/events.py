@@ -105,6 +105,18 @@ class Message:
         
         return shouldReturn
     
+    def setNextHandler(self, handlerName, errorHandlerName=None):
+        """Schedules 'handlerName' as the next handler to execute. Optionally,
+        also schedules 'errorHandlerName' as the next error handler.
+        """
+        handler = Dispatcher().getHandlerFunc(handlerName)
+        if handler:
+            self.handlers.insert(0, handler())
+            if errorHandlerName:
+                eHandler = Dispatcher().getHandlerFunc(errorHandlerName)
+                if eHandler:
+                    self.errorHandlers.insert(0, eHandler())
+    
 class _Dispatcher(object):
     """Dispatches events in a phase to Messages for handling. This class
     uses the Singleton pattern.
@@ -149,6 +161,12 @@ class _Dispatcher(object):
                 
         msg = Message(tree, conn, handlers, errorHandlers, phaseName)
         msg.process()
+    
+    def getHandlerFunc(self, handlerName):
+        """Gets a reference to the handler function"""
+        if h.has_key(handlerName):
+            return h[handlerName]['handler']
+        else: return None
 
 _dispatcher = _Dispatcher()
 def Dispatcher(): return _dispatcher

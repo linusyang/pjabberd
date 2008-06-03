@@ -3,9 +3,6 @@ from pjs.elementtree.ElementTree import Element, SubElement, tostring
 
 class IQNotImplementedHandler(Handler):
     """Handler that replies to unknown iq stanzas"""
-    def __init__(self):
-        pass
-
     def handle(self, tree, msg, lastRetVal=None):
         if len(tree) > 0:
             # get the original iq msg

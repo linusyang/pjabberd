@@ -19,10 +19,30 @@ class IncrStreamParser:
 
     def __init__(self, conn=None):
         self.conn = conn
+        self._parser = None
+        
+        self.resetParser()
+        self.resetStream()
+    
+    def resetStream(self):
+        """Reset the stream"""
+        self.depth = 0
+        self.tree = None
+        self.stream = None # this is the main <stream> et.Element
+        # name memo cache. from ElementTree
+        self._names = {} # clear because this parser may be reused for another
+                         # stream if it's picked up from a pool later
+        # ns of the stream: jabber:client / jabber:server
+        self.ns = None
+                         
+    def resetParser(self):
+        """Reset the parser"""
         # '}' is a ns-separator used in ET 1.3alpha. We want to duplicate its
         # behaviour here because its TreeBuilder doesn't prefix node names
         # with their namespace. Asking expat to do so will remove the xmlns
         # attrs from elements it encounters.
+        if self._parser:
+            del self._parser # get rid of circular references
         self._parser = expat.ParserCreate(None, '}')
         self._parser.StartElementHandler = self.handle_start
         self._parser.EndElementHandler = self.handle_end
@@ -31,23 +51,9 @@ class IncrStreamParser:
         self._parser.buffer_text = 1 # single handle_text call per text node
         self._parser.returns_unicode = 1 # handler funcs get unicode from expat
         
-        self._names = {} # name memo cache. from ElementTree
-        
-        # this is the main <stream> et.Element
-        self.stream = None
-        
-        # ns of the stream: jabber:client / jabber:server
-        self.ns = None
-        
-        self.reset()
-    
-    def reset(self):
-        """Reset the stream"""
+        # need to reset parts of the stream as well to ensure correct parsing
         self.depth = 0
         self.tree = None
-        self.stream = None
-        self._names = {} # clear because this parser may be reused for another
-                         # stream
 
     def feed(self, data):
         """Read a chunk of data to parse. The complete XML in the chunk will
@@ -61,7 +67,7 @@ class IncrStreamParser:
         self._parser.Parse("", 1) # end of data
         del self._parser # get rid of circular references
         
-        self.reset()
+        self.resetStream()
 
     def handle_start(self, tag, attrs):
         """Handles the opening-tag event. It is fired whenever the closing
@@ -76,8 +82,12 @@ class IncrStreamParser:
         assert(self.depth >= 1)
         
         if self.depth == 1:
-            # if starting a new stream, reset the old one
-            if self.stream: self.reset()
+            # if starting a new stream, don't reset the old one, because
+            # we don't want to deal with changed namespaces or attributes
+            # for now.
+            if self.stream is not None:
+                Dispatcher().dispatch(self.stream, self.conn, 'stream-reinit')
+                return
             
             # handle <stream>, record it for XPath wrapping
             self.stream = et.Element(self._fixname(tag), attrs)

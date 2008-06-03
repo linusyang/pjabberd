@@ -23,7 +23,7 @@ class Connection(asyncore.dispatcher_with_send):
         except:
             # log it
             pass
-        self.parser.reset()
+        self.parser.resetStream()
         self.close()
         
     def handle_read(self):

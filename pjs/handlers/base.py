@@ -2,7 +2,7 @@ class Handler:
     """Generic in-process handler (cannot block)"""
     def __init__(self):
         """Will be called at server start"""
-        raise NotImplementedError, 'needs to be overridden in a subclass'
+        pass
     
     def handle(self, tree, msg, lastRetVal=None):
         """Handle a message.
@@ -23,7 +23,7 @@ class ThreadedHandler:
     """
     def __init__(self):
         """Will be called at server start"""
-        raise NotImplementedError, 'needs to be overridden in a subclass'
+        pass
     
     def handle(self, tree, msg, lastRetVal=None):
         """Handle a message.
