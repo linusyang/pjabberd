@@ -84,33 +84,9 @@ class IQRosterGetHandler(ThreadedHandler):
                 # TODO: throw exception here
                 return
             
-            c = DB().cursor()
-            # get the contactid, name and subscriptions
-            c.execute("SELECT roster.contactid, roster.name,\
-                              substates.primaryName subscription,\
-                              contactjids.jid cjid\
-                       FROM roster\
-                           JOIN jids AS userjids ON roster.userid = userjids.id\
-                           JOIN jids AS contactjids ON roster.contactid = contactjids.id\
-                           JOIN substates ON substates.stateid = roster.subscription\
-                       WHERE userjids.jid = ?", (jid,))
+            roster = Roster(jid)
             
-            roster = Roster()
-            
-            for row in c:
-                roster.addItem(row['contactid'], RosterItem(row['cjid'], row['name'], row['subscription']))
-            
-            # get the groups now for each cid
-            c.execute("SELECT rgi.contactid, rgs.name\
-                       FROM rostergroups AS rgs\
-                           JOIN rostergroupitems AS rgi ON rgi.groupid = rgs.groupid\
-                           JOIN jids ON rgs.userid = jids.id\
-                       WHERE jids.jid = ?", (jid,))
-            
-            for row in c:
-                roster.addGroup(row['contactid'], row['name'])
-                
-            c.close()
+            roster.loadRoster()
             
             res = Element('iq', {
                                  'to' : '/'.join([jid, resource]),
@@ -163,7 +139,6 @@ class IQRosterUpdateHandler(ThreadedHandler):
         def act():
             # TODO: verify that it's coming from a known user
             jid = msg.conn.data['user']['jid']
-            resource = msg.conn.data['user']['resource']
             id = tree[0].get('id')
             if id is None:
                 logging.warning('[roster] No id in roster get query. Tree: %s', tree[0])
@@ -183,90 +158,13 @@ class IQRosterUpdateHandler(ThreadedHandler):
             
             groups = list(item.findall('{jabber:iq:roster}group'))
             
-            c = DB().cursor()
+            roster = Roster(jid)
             
-            # get our own id
-            c.execute("SELECT id FROM jids WHERE jid = ?", (jid,))
-            res = c.fetchone()
-            if res is None:
-                # TODO: throw exception here
-                return
+            cid = roster.updateContact(cjid, groups, name)
             
-            uid = res[0]
-            
-            # check if this is an update to an existing roster entry
-            c.execute("SELECT cjids.id cid \
-                       FROM roster\
-                       JOIN jids AS cjids ON cjids.id = roster.contactid\
-                       JOIN jids AS ujids ON ujids.id = roster.userid\
-                       WHERE ujids.jid = ? AND cjids.jid = ?", (jid, cjid))
-            res = c.fetchone()
-            if res:
-                # this is an update
-                # we don't update the subscription as it's the job of <presence>
-                cid = res[0]
-                c.execute("UPDATE roster SET name = ? WHERE contactid = ?",
-                          (name or '', cid))
-            else:
-                # this is a new roster entry
-                
-                # check if the contact JID already exists in our DB
-                c.execute("SELECT id FROM jids WHERE jid = ?", (cjid,))
-                res = c.fetchone()
-                if res:
-                    cid = res[0]
-                else:
-                    # create new JID entry
-                    res = c.execute("INSERT INTO jids\
-                                     (jid, password)\
-                                     VALUES\
-                                     (?, '')", (cjid,))
-                    cid = res.lastrowid
-                    
-                c.execute("INSERT INTO roster\
-                           (userid, contactid, name, subscription)\
-                           VALUES\
-                           (?, ?, ?, ?)", (uid, cid, name or '', 0))
-                    
-                    
-            # UPDATE GROUPS
-            # remove all group mappings for this contact and recreate
-            # them, since it's easier than figuring out what changed
-            c.execute("DELETE FROM rostergroupitems\
-                       WHERE contactid = ? AND groupid IN\
-                       (SELECT groupid FROM rostergroups WHERE\
-                           userid = ?)", (cid, uid))
-            for groupName in groups:
-                # get the group id
-                c.execute("SELECT groupid\
-                           FROM rostergroups\
-                           WHERE userid = ? AND name = ?", (uid, groupName.text))
-                res = c.fetchone()
-                if res:
-                    gid = res[0]
-                else:
-                    # need to create the group
-                    res = c.execute("INSERT INTO rostergroups\
-                                     (userid, name)\
-                                     VALUES\
-                                     (?, ?)", (uid, groupName.text))
-                    gid = res.lastrowid
-                
-                c.execute("INSERT INTO rostergroupitems\
-                           (groupid, contactid)\
-                           VALUES\
-                           (?, ?)", (gid, cid))
-                
             # get the subscription status before roster push
-            c.execute("SELECT primaryname FROM substates\
-                       JOIN roster on roster.subscription = substates.stateid\
-                       WHERE roster.userid = ? AND roster.contactid = ?", (uid, cid))
-            res = c.fetchone()
-            if res is None:
-                sub = 'none'
-            else:
-                sub = res[0]
-            
+            sub = roster.getSubPrimaryName(cid)
+                
             # prepare the result for roster push
             query = Element('query', {'xmlns' : 'jabber:iq:roster'})
             
