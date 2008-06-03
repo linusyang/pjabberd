@@ -71,6 +71,15 @@ class Message:
                 self.gotException = True
                 self.lastRetVal = e
                 
+            if self.gotException and errorHandler is not None:
+                # try the errorHandler in the same link now
+                try:
+                    self.lastRetVal = errorHandler.handle(self.tree, self, self.lastRetVal)
+                    self.getException = False
+                except Exception, e:
+                    self.gotException = True
+                    self.lastRetVal = e
+                
         elif isinstance(nextHandler, pjs.handlers.base.ThreadedHandler):
             # run out of process with a callback to resume
             checkFunc, initFunc = nextHandler.handle(self.tree, self, self.lastRetVal)
