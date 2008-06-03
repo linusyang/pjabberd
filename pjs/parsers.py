@@ -8,6 +8,9 @@ from xml.parsers import expat
 from pjs.events import Dispatcher, C2SStanzaDispatcher, S2SStanzaDispatcher
 from copy import deepcopy
 
+# some quirks mode constants
+QUIRK_MISSING_NEW_STREAM = 'missing-new-stream'
+
 def borrow_parser(conn):
     """Borrow a parser from a pool of parsers"""
     # TODO: implement the pool. For now just return a new parser
@@ -28,9 +31,7 @@ class IncrStreamParser:
         self.conn = conn
         self._parser = None
         
-        # FIXME: remove these 2 lines
-        self.seenSoFar = ''
-        self.resets = 0
+        self._exception = None # set this on quirky input
         
         self.resetParser()
         self.resetStream()
@@ -45,6 +46,7 @@ class IncrStreamParser:
                          # stream if it's picked up from a pool later
         # ns of the stream: jabber:client / jabber:server
         self.ns = None
+        self._exception = None
                          
     def resetParser(self):
         """Reset the parser"""
@@ -65,8 +67,7 @@ class IncrStreamParser:
         # need to reset parts of the stream as well to ensure correct parsing
         self.depth = 0
         self.tree = None
-        
-        self.resets += 1
+        self._exception = None
         
     def disable(self):
         """Turns off all handlers for this parser, so data will be parsed,
@@ -100,18 +101,52 @@ class IncrStreamParser:
 #                          self.__class__, self.conn.id, data)
         
         # FIXME: delete the next two lines
-        if data == "<presence to='dv@localhost' type='subscribe' from='tro@localhost'/>":
-            logging.info("Parser about to eat S2S presence with parser %s and conn %s",
-                         self, self.conn.id)
+#        if data == "<presence to='dv@localhost' type='subscribe' from='tro@localhost'/>":
+#            logging.info("Parser about to eat S2S presence with parser %s and conn %s",
+#                         self, self.conn.id)
             
 #        if self.conn.id.find('sin') != -1 or self.conn.id.find('sout') != -1:
 #            self.seenSoFar += data
 #            logging.debug("Parser for connection %s seen so far: %s", self.conn.id, self.seenSoFar)
+        
         try:
             self._parser.Parse(data, 0)
         except Exception, e:
-            logging.warning("parser died with %s", e)
-        a = 1+1
+            logging.warning("[%s] Parser died with %s",
+                            self.__class__, e)
+            
+        if self._exception:
+            # the parser found quirky input
+            cause = self._exception.cause
+            if cause:
+                if cause == QUIRK_MISSING_NEW_STREAM:
+                    # some non-compliant clients (ahem Kopete) don't reset
+                    # the stream after auth, which we assume should happen
+                    # implicitly as stated in the spec (3920 #6.2).
+                    # we fake that we're in stream.
+                    self._exception = None
+                    self.resetParser()
+                    self.disable()
+                    newdata = "<?xml version='1.0' ?>" +\
+                            "<stream:stream xmlns='jabber:client' " +\
+                            "xmlns:stream='http://etherx.jabber.org/streams' " +\
+                            "version='1.0'>"
+                    self.feed(newdata)
+                    self.depth = 1
+                    self.stream = et.Element('{http://etherx.jabber.org/streams}stream',
+                                            {'version' : '1.0'})
+                    self.ns = 'jabber:client'
+                    self.enable()
+            else:
+                logging.debug("[%s] Parser got quirky input and doesn't " +\
+                              "know how to proceed. Ignoring data: %s",
+                              self.__class__, data)
+                self._exception = None
+                return
+            
+            self._exception = None
+            # retry parsing
+            self.feed(data)
 
     def close(self):
         """CLose the stream of XML data"""
@@ -131,6 +166,10 @@ class IncrStreamParser:
         self.depth += 1
         
         assert(self.depth >= 1)
+        
+        if self.depth == 1 and tag.find('stream') == -1:
+            self._exception = QuirksModeException(QUIRK_MISSING_NEW_STREAM)
+            return
         
         if self.depth == 1:
             # if starting a new stream, don't reset the old one, because
@@ -167,6 +206,8 @@ class IncrStreamParser:
         """Handles the closing-tag event. It is fired whenever the closing
         bracket of a closing XML element is encountered (ie. '>' in "</stream>").
         """
+        if self._exception:
+            return
         self.depth -= 1
         
         assert(self.depth >= 0)
@@ -219,6 +260,9 @@ class IncrStreamParser:
         """
         # TODO: test on very large text node. Will expat's buffer overflow?
         
+        if self._exception:
+            return
+        
         if self.depth <= 1 and not text.strip():
             return
         
@@ -248,3 +292,8 @@ class IncrStreamParser:
                 name = "{" + name
             self._names[key] = name
         return name
+
+class QuirksModeException(Exception):
+    def __init__(self, cause=None):
+        Exception.__init__(self)
+        self.cause = cause
