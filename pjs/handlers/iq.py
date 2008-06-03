@@ -262,14 +262,16 @@ class RosterPushHandler(ThreadedHandler):
             
             resources = msg.conn.server.data['resources'][jid]
             for res, con in resources.items():
-                iq = Element('iq', {
-                                    'to' : '%s/%s' % (jid, res),
-                                    'type' : 'set',
-                                    'id' : generateId()[:10]
-                                    })
-                iq.append(query)
-                
-                con.send(tostring(iq))
+                # don't send the roster to clients that didn't request it
+                if con.data['user']['requestedRoster']:
+                    iq = Element('iq', {
+                                        'to' : '%s/%s' % (jid, res),
+                                        'type' : 'set',
+                                        'id' : generateId()[:10]
+                                        })
+                    iq.append(query)
+                    
+                    con.send(tostring(iq))
                 
             # send an ack to client
             iq = Element('iq', {
