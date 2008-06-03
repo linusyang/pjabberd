@@ -6,7 +6,7 @@ import os, os.path, sys
 
 from pjs.connection import Connection, LocalTriggerConnection
 from pjs.async.core import dispatcher
-from pjs.db import db
+from pjs.db import DB, sqlite
 
 class Server(dispatcher):
     def __init__(self, ip, port):
@@ -68,13 +68,18 @@ if __name__ == '__main__':
             print >> sys.stderr, 'Could not create logging directory'
             configLogging()
         
-    c = db.cursor()
-    c.execute("CREATE TABLE users (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,\
-                                   jid TEXT NOT NULL,\
-                                   username TEXT NOT NULL,\
-                                   password TEXT NOT NULL,\
-                                   UNIQUE(jid))")
-    c.execute("INSERT INTO users (jid, username, password) VALUES ('tro@localhost', 'tro', 'test')")
+    con = DB()
+    c = con.cursor()
+    try:
+        c.execute("CREATE TABLE users (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,\
+                                       jid TEXT NOT NULL,\
+                                       username TEXT NOT NULL,\
+                                       password TEXT NOT NULL,\
+                                       UNIQUE(jid))")
+        c.execute("INSERT INTO users (jid, username, password) VALUES ('tro@localhost', 'tro', 'test')")
+    except sqlite.OperationalError, e:
+        if e.message.find('already exists') >= 0: pass
+        else: raise
     c.close()
     
     s = Server('localhost', 5222)
@@ -85,4 +90,5 @@ if __name__ == '__main__':
         pjs.async.core.loop()
     except KeyboardInterrupt:
         # clean up
+        logging.info("KeyboardInterrupt sent. Shutting down...")
         logging.shutdown()

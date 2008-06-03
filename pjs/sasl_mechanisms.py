@@ -2,7 +2,7 @@ import binascii
 import base64
 import re
 
-from pjs.db import db
+from pjs.db import DB
 from pjs.utils import generateId
 from pjs.elementtree.ElementTree import Element
 
@@ -84,12 +84,13 @@ class Plain:
             if len(auth) != 3:
                 raise SASLIncorrectEncodingError
             
-            c = db.cursor()
+            c = DB().cursor()
             c.execute("SELECT * FROM users WHERE \
                 username = ? AND password = ?", (auth[1], auth[2]))
             res = c.fetchall()
             if len(res) == 0:
                 raise SASLAuthError
+            c.close()
         
         self.msg.conn.data['sasl']['complete'] = True
         self.msg.conn.data['user'] = {
@@ -181,7 +182,7 @@ class DigestMD5:
                 raise SASLAuthError
             
             # fetch the password now
-            c = db.cursor()
+            c = DB().cursor()
             c.execute("SELECT password FROM users WHERE \
                 username = ?", (username,))
             res = c.fetchall()
@@ -190,6 +191,7 @@ class DigestMD5:
                 raise SASLAuthError
             else:
                 password = res[0][0]
+            c.close()
             
             # compute the digest as per RFC 2831
             a1 = "%s:%s:%s" % (H("%s:%s:%s" % (username, realm, password)),

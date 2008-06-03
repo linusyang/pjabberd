@@ -67,23 +67,53 @@ class SASLAuthHandler(ThreadedHandler):
         
     def resume(self): pass
         
-class SASLResponseHandler(Handler):
+class SASLResponseHandler(ThreadedHandler):
     """Handles SASL's <response> element sent from the other side"""
+    def __init__(self):
+        self.done = False
+        
     def handle(self, tree, msg, lastRetVal=None):
-        try:
-            mech = msg.conn.data['sasl']['mechObj']
-        except KeyError:
-            # TODO: close connection
-            logging.warning("Mech object doesn't exist in connection data for %s",
-                            msg.conn.addr)
-            logging.debug("%s", msg.conn.data)
-            return
-
-        text = tree[0].text
-        if text:
-            mech.handle(msg, text.strip())
-        else:
-            mech.handle(msg, tree)
+        # this is true when the threaded handler returns
+        self.done = False
+        
+        tpool = msg.conn.server.threadpool
+        
+        # the actual function executing in the thread
+        def act(tree, msg):
+            try:
+                mech = msg.conn.data['sasl']['mechObj']
+            except KeyError:
+                # TODO: close connection
+                logging.warning("Mech object doesn't exist in connection data for %s",
+                                msg.conn.addr)
+                logging.debug("%s", msg.conn.data)
+                return
+    
+            text = tree[0].text
+            if text:
+                mech.handle(msg, text.strip())
+            else:
+                mech.handle(msg, tree)
+                
+        def cb(workReq, retVal):
+            self.done = True
+            
+        req = threadpool.makeRequests(act,
+                                 [(None, {'tree' : tree, 'msg' : msg})],
+                                 cb)
+        
+        def checkFunc():
+            # need to poll manually or the callback's never called from the pool
+            poll(tpool)
+            return self.done
+        
+        def initFunc():
+            tpool.putRequest(req[0])
+        
+        return FunctionCall(checkFunc), FunctionCall(initFunc)
+    
+    def resume(self): pass
+        
         
 class SASLErrorHandler(Handler):
     def handle(self, tree, msg, lastRetVal=None):
