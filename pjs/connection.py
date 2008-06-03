@@ -15,27 +15,26 @@ class Connection(asyncore.dispatcher_with_send):
         self.parser = parsers.borrow_parser(self)
         
         # any sort of per-connection data. can be accessed by handlers.
-        # right now:
-        # 'stream' : {
-        #              'in-stream' : True/False (False before <stream> sent and after </stream>),
-        #              'type' : 'client'/'server' (ie. c2s/s2s),
-        #              'id' : streamid (as str)
-        #            },
-        # 'sasl' : {
-        #            'mech' : 'PLAIN' / 'DIGEST-MD5',
-        #            'mechObj' : <reference to one of SASL mech objects>
-        #            'complete' : True/False
-        #          },
-        # 'tls' : {
-        #           'complete' : True/False
-        #         }
-        # 'user' : {
-        #            'jid' : str (server-assigned jid),
-        #            'resource' : str (server-assigned resource),
-        #            'in-session' : True/False (True if <session> sent/accepted)
-        #          },
-        #
         self.data = {}
+        self.data['stream'] = {
+                               'in-stream' : False, # False before <stream> sent and after </stream>
+                               'type' : 'c2s',
+                               'id' : ''
+                               }
+        self.data['sasl'] = {
+                             'mech' : 'DIGEST-MD5', # or PLAIN
+                             'mechObj' : None, # <reference to one of SASL mech objects>
+                             'complete' : False
+                             }
+        self.data['tls'] = {
+                            'enabled' : False,
+                            'complete' : False
+                            }
+        self.data['user'] = {
+                             'jid' : '',
+                             'resource' : '',
+                             'in-session' : False # True if <session> sent/accepted
+                             }
         
         logging.info("New connection accepted from %s", self.addr)
         

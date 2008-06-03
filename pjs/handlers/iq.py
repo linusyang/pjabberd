@@ -17,7 +17,9 @@ class IQBindHandler(Handler):
                 resource = bind[0].text
             else:
                 # generate an id
-                resource = generateId()
+                resource = generateId()[:6]
+            
+            # TODO: check that we don't already have such a resource
             
             msg.conn.data['user']['resource'] = resource
                 

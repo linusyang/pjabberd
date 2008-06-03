@@ -24,11 +24,9 @@ class StreamInitHandler(Handler):
         
         id = generateId()
         
-        msg.conn.data['stream'] = {
-                                   'in-stream' : True,
-                                   'type' : streamType,
-                                   'id' : id
-                                   }
+        msg.conn.data['stream']['in-stream'] = True
+        msg.conn.data['stream']['type'] = streamType
+        msg.conn.data['stream']['id'] = id
         
         # no one should need to modify this, so we don't pass it along
         # to the next handler, but just add it to the socket write queue
@@ -61,18 +59,14 @@ class StreamReInitHandler(Handler):
                         "xmlns:stream='http://etherx.jabber.org/streams' " + \
                         "version='1.0'>")
         
-        try:
-            if msg.conn.data['tls']['complete']:
-                # TODO: go to features-auth
-                return lastRetVal
-        except KeyError: pass
+        if msg.conn.data['tls']['complete']:
+            # TODO: go to features-auth
+            return lastRetVal
         
-        try:
-            if msg.conn.data['sasl']['complete']:
-                msg.setNextHandler('write')
-                msg.setNextHandler('features-postauth')
-                return lastRetVal
-        except KeyError: pass
+        if msg.conn.data['sasl']['complete']:
+            msg.setNextHandler('write')
+            msg.setNextHandler('features-postauth')
+            return lastRetVal
         
         # TODO: go to features-init
 

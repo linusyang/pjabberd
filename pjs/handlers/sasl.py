@@ -29,14 +29,6 @@ class SASLAuthHandler(ThreadedHandler):
         def act(tree, msg):
             mech = tree[0].get('mechanism')
             
-            if not msg.conn.data.has_key('sasl'):
-                msg.conn.data['sasl'] = {
-                                         'mech' : '',
-                                         'challenge' : '',
-                                         'stage' : 0,
-                                         'complete' : False
-                                         }
-            
             if mech == 'PLAIN':
                 msg.conn.data['sasl']['mech'] = 'PLAIN'
                 authtext64 = tree[0].text
@@ -92,9 +84,8 @@ class SASLResponseHandler(ThreadedHandler):
         
         # the actual function executing in the thread
         def act(tree, msg):
-            try:
-                mech = msg.conn.data['sasl']['mechObj']
-            except KeyError:
+            mech = msg.conn.data['sasl']['mechObj']
+            if not mech:
                 # TODO: close connection
                 logging.warning("Mech object doesn't exist in connection data for %s",
                                 msg.conn.addr)
