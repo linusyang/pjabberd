@@ -126,6 +126,7 @@ class _Dispatcher(object):
 
         # handlers get instantiated and loaded up into lists
         # TODO: watch for errors during instantiation
+        # TODO: instantiate once, cache the handler and reuse
         if phase.has_key('handlers'):
             handlers = [item['handler']() for item in phase['handlers']]
             if phase.has_key('errorHandlers'):

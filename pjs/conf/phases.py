@@ -3,6 +3,7 @@
 from pjs.conf.handlers import handlers as h
 
 # TODO: add functions to fetch phases from the config file
+# TODO: add ordering to phases, so that we can decide on conflicts
 
 phases = {
           'default' : {

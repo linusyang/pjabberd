@@ -3,6 +3,7 @@
 import pjs.handlers.write
 import pjs.handlers.simple
 import pjs.handlers.stream
+import pjs.handlers.iq
 
 # TODO: add functions to fetch handlers from the config file
 
@@ -18,5 +19,9 @@ handlers = {
             'stream-init' : {
                              'handler' : pjs.handlers.stream.StreamInitHandler,
                              'description' : 'initializes the stream'
-                             }
+                             },
+            'iq-not-implemented' : {
+                                    'handler' : pjs.handlers.iq.IQNotImplementedHandler,
+                                    'description' : 'returns a iq-not-implemented error'
+                                    }
             }

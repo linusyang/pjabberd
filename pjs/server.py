@@ -26,5 +26,5 @@ class Server(dispatcher):
         self.close()
         
 if __name__ == '__main__':
-    s = Server('', 44444)
+    s = Server('localhost', 44444)
     pjs.async.core.loop()
