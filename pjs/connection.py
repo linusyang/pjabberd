@@ -89,6 +89,7 @@ class LocalTriggerConnection(asyncore.dispatcher_with_send):
         logging.warning("Socket exception occured for %s on local trigger socket", self.addr)
     
     def handle_close(self):
+        del self.server.conns[self.id]
         self.close()
         
     def handle_read(self): pass
