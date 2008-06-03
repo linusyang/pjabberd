@@ -74,7 +74,8 @@ class Roster:
         name = name or ''
         groups = groups or []
         
-        c = DB().cursor()
+        con = DB()
+        c = con.cursor()
         
         # check if this is an update to an existing roster entry
         c.execute("SELECT cjids.id cid \
@@ -147,7 +148,17 @@ class Roster:
                        (groupid, contactid)\
                        VALUES\
                        (?, ?)", (gid, cid))
-        c.close()
+        
+        try:
+            con.commit()
+        except Exception, e:
+            try:
+                con.rollback()
+            except: pass
+            c.close()
+            raise e
+        else:
+            c.close()
             
         return cid
     
@@ -155,7 +166,8 @@ class Roster:
         """Removes the contact from this user's roster. Returns the contact's
         id in the DB.
         """
-        c = DB().cursor()
+        con = DB()
+        c = con.cursor()
         
         # get the contact's id
         c.execute("SELECT jids.id\
@@ -180,7 +192,16 @@ class Roster:
         c.execute("DELETE FROM roster\
                    WHERE userid = ? AND contactid = ?", (self.uid, cid))
         
-        c.close()
+        try:
+            con.commit()
+        except Exception, e:
+            try:
+                con.rollback()
+            except: pass
+            c.close()
+            raise e
+        else:
+            c.close()
         
         return cid
         
@@ -202,10 +223,20 @@ class Roster:
         contact with ID cid to sub, which is an id retrieved via the
         Subscription class.
         """
-        c = DB().cursor()
+        con = DB()
+        c = con.cursor()
         c.execute("UPDATE roster SET subscription = ?\
                    WHERE userid = ? AND contactid = ?", (sub, self.uid, cid))
-        c.close()
+        try:
+            con.commit()
+        except Exception, e:
+            try:
+                con.rollback()
+            except: pass
+            c.close()
+            raise e
+        else:
+            c.close()
     
     def getSubPrimaryName(self, cid):
         """Gets the primary name of a subscription for this user and this

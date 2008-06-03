@@ -102,6 +102,7 @@ if __name__ == '__main__':
                      PRIMARY KEY (groupid, contactid))")
         c.execute("INSERT INTO jids (jid, password) VALUES ('tro@localhost', 'test')")
         c.execute("INSERT INTO jids (jid, password) VALUES ('dv@localhost', 'test')")
+        con.commit()
 #        c.execute("INSERT INTO roster (userid, contactid, subscription) VALUES (1, 2, 8)")
 #        c.execute("INSERT INTO roster (userid, contactid, subscription) VALUES (2, 1, 8)")
 #        c.execute("INSERT INTO rostergroups (userid, name) VALUES (1, 'friends')")

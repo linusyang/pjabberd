@@ -20,8 +20,8 @@ class IncrStreamParser:
     close() is called, it will throw a xml.parsers.expat.ExpatError.
     """
     
-    c2sStanzaRe = re.compile(r'{jabber:client}\b(iq|message|presence)\b', re.U | re.I)
-    s2sStanzaRe = re.compile(r'{jabber:server}\b(iq|message|presence)\b', re.U | re.I)
+    c2sStanzaRe = re.compile(r'{jabber:client}(iq|message|presence)\b', re.U | re.I)
+    s2sStanzaRe = re.compile(r'{jabber:server}(iq|message|presence)\b', re.U | re.I)
 
     def __init__(self, conn=None):
         self.conn = conn
@@ -69,6 +69,10 @@ class IncrStreamParser:
 #        if data != ' ':
 #            logging.debug("[%s] For connection %s parser got: %s",
 #                          self.__class__, self.conn.id, data)
+        
+        # FIXME: delete the next two lines
+        if data == "<presence to='dv@localhost' type='subscribe' from='tro@localhost'/>":
+            logging.info("Parser about to eat S2S presence")
         self._parser.Parse(data, 0)
 
     def close(self):
@@ -140,6 +144,12 @@ class IncrStreamParser:
             if IncrStreamParser.c2sStanzaRe.search(self.tree.tag):
                 C2SStanzaDispatcher().dispatch(tree, self.conn)
             elif IncrStreamParser.s2sStanzaRe.search(self.tree.tag):
+                # FIXME: remove this
+                if tree[0].tag == '{jabber:server}presence' and\
+                tree[0].get('type') == 'subscribe' and\
+                tree[0].get('to') == 'dv@localhost' and\
+                tree[0].get('from') == 'tro@localhost':
+                    logging.debug("Got the S2S presence")
                 S2SStanzaDispatcher().dispatch(tree, self.conn)
             else:
                 Dispatcher().dispatch(tree, self.conn)

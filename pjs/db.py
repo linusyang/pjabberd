@@ -7,7 +7,7 @@ except ImportError:
 
 def DB():
     """Connects to the database and returns the connection"""
-    db = sqlite.connect('db', isolation_level=None, timeout=99999999)
+    db = sqlite.connect('db', timeout=99999999)
     # allows us to select by column name instead of just by index
     db.row_factory = sqlite.Row
     return db

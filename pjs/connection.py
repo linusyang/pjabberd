@@ -101,9 +101,6 @@ class ServerConnection(Connection):
                                'hostname' : '',
                                }
         
-        logging.info("[%s] New s2s connection accepted from %s",
-                     self.__class__, self.addr)
-        
 class ServerInConnection(ServerConnection):
     """An s2s connection to us from a remote server"""
     def __init__(self, sock, addr, server):
@@ -112,6 +109,8 @@ class ServerInConnection(ServerConnection):
         self.id = 'sin%s' % id(self)
         
         self.data['server']['direction'] = 'from'
+        
+        logging.info("New ServerInConnection created with %s", addr)
         
     def handle_close(self):
         hostname = self.data['server']['hostname']
@@ -123,6 +122,11 @@ class ServerInConnection(ServerConnection):
             self.server.s2sConns[hostname][0] = None
         
         ServerConnection.handle_close(self)
+        
+    # FIXME: remove this
+    def handle_read(self):
+        data = self.recv(4096)
+        self.parser.feed(data)
         
 class ServerOutConnection(ServerConnection):
     """An s2s connection from us to a remote server"""
@@ -136,6 +140,8 @@ class ServerOutConnection(ServerConnection):
         # queue of messages to send to the remote server as soon as we are
         # ready (ie. completed auth, tls, db, etc.)
         self.outQueue = []
+        
+        logging.info("New ServerOutConnection created with %s", addr)
         
     def handle_close(self):
         hostname = self.data['server']['hostname']
