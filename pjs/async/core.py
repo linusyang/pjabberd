@@ -9,7 +9,7 @@ try:
 except NameError:
     func_map = {}
     
-def pollWithFunctions(timeout=0.0, map=None):
+def _pollWithFunctions(timeout=0.0, map=None):
     if map is None:
         map = socket_map
     if map:
@@ -55,7 +55,7 @@ def pollWithFunctions(timeout=0.0, map=None):
     if func_map:
         funcCheck()
         
-def poll2WithFunctions(timeout=0.0, map=None):
+def _poll2WithFunctions(timeout=0.0, map=None):
     # Use the poll() support added to the select module in Python 2.0
     if map is None:
         map = socket_map
@@ -90,8 +90,8 @@ def poll2WithFunctions(timeout=0.0, map=None):
     if func_map:
         funcCheck()
         
-poll = pollWithFunctions
-poll2 = poll2WithFunctions
+poll = _pollWithFunctions
+poll2 = _poll2WithFunctions
 poll3 = poll2
 
 def funcCheck():
@@ -111,7 +111,7 @@ def funcCheck():
             cb()
             del func_map[f]
 
-class dispatcherWithFunctions(asyncore.dispatcher):
+class _dispatcherWithFunctions(asyncore.dispatcher):
     def __init__(self, sock=None, map=None):
         asyncore.dispatcher.__init__(self, sock, map)
         
@@ -141,9 +141,9 @@ class dispatcherWithFunctions(asyncore.dispatcher):
         
         func_map[checkFunc] = cb
 
-dispatcher = dispatcherWithFunctions
+dispatcher = _dispatcherWithFunctions
 
-class dispatcher_with_sendWithFunctions(asyncore.dispatcher_with_send):
+class _dispatcher_with_sendWithFunctions(asyncore.dispatcher_with_send):
     def __init__(self, sock=None, map=None):
         asyncore.dispatcher_with_send.__init__(self, sock, map)
     
@@ -173,4 +173,4 @@ class dispatcher_with_sendWithFunctions(asyncore.dispatcher_with_send):
         
         func_map[checkFunc] = cb
         
-dispatcher_with_send = dispatcher_with_sendWithFunctions
+dispatcher_with_send = _dispatcher_with_sendWithFunctions
