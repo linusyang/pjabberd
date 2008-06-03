@@ -12,20 +12,33 @@ class Message:
         self.errorHandlers = errorHandlers or []
         self.currentPhase = currentPhase
         
-        # signals to process() to stop running handlers
+        # Signals to process() to stop running handlers. Handlers can signal
+        # this directly.
         self.stopChain = False
         
-        # return value from the last handler. Could be an Exception object.
-        self.lastRetVal = None
+        # Currently executing pair of (handler, errorHandler)
+        # This is saved in order to properly handle exceptions thrown in
+        # handlers.
+        self._runningHandlers = (None, None)
+        # Indicates whether we're executing the last handler in a pair. This is
+        # necessary, because we need to decide when to clear
+        # self.runningHandlers to proceed to the next pair.
+        # Setting this to True is basically skipping the remaining handler in
+        # pair and proceeding to the next set.
+        self.lastInPair = False
         
-        # indicates whether the last handler threw and exception
-        self.gotException = False
+        # Return value from the last handler. Could be an Exception object.
+        self._lastRetVal = None
         
-        # called by this object to notify the waiting handler that it can
-        # continue
-        self.handlerResumeFunc = None
+        # Indicates whether the last handler threw and exception
+        self._gotException = False
         
-        # for handlers to append to. the write handler will process this.
+        # Called by this object to notify the waiting handler that it can
+        # continue.
+        self._handlerResumeFunc = None
+        
+        # For handlers to append to. the write handler will process this.
+        # Use addTextOutput() instead of appending to this directly.
         self.outputBuffer = u''
         
     def addTextOutput(self, data):
@@ -37,7 +50,7 @@ class Message:
     def process(self):
         """Runs the handlers"""
         
-        # if we don't have error handlers, that's ok, but if we don't have
+        # If we don't have error handlers, that's ok, but if we don't have
         # handlers, then we quit. Handlers are popped from the handlers list
         # instead of iterated on because we expect handlers to be able to add
         # other handlers onto the list.
@@ -45,17 +58,23 @@ class Message:
             if self.stopChain:
                 break
             
-            try:
-                handler = self.handlers.pop(0)
-            except IndexError:
-                break
-            
-            try:
-                errorHandler = self.errorHandlers.pop(0)
-            except IndexError:
-                errorHandler = None
+            if self._runningHandlers != (None, None):
+                handler, errorHandler = self._runningHandlers
+            else:
+                try:
+                    handler = self.handlers.pop(0)
+                except IndexError:
+                    break
                 
-            shouldReturn = self._execLink(handler, errorHandler)
+                try:
+                    errorHandler = self.errorHandlers.pop(0)
+                except IndexError:
+                    errorHandler = None
+                
+                self._runningHandlers = (handler, errorHandler)
+                self.lastInPair = False
+                
+            shouldReturn = self._execLink()
             
             if shouldReturn:
                 return
@@ -64,47 +83,73 @@ class Message:
         """Resumes the execution of handlers. This is the callback for when
         the thread is done executing. It gets called by the Connection.
         """
-        if callable(self.handlerResumeFunc):
-            self.handlerResumeFunc()
+        if callable(self._handlerResumeFunc):
+            self._lastRetVal = self._handlerResumeFunc()
+        if isinstance(self._lastRetVal, Exception):
+            self._gotException = True
+        else:
+            self._gotException = False
+            self.lastInPair = True
+        self._updateRunningHandlers()
         self.process()
             
-    def _execLink(self, handler, errorHandler):
+    def _updateRunningHandlers(self):
+        """Resets running handlers to None if executing the last handler"""
+        if self.lastInPair:
+            self._runningHandlers = (None, None)
+    
+    def _execHandler(self, handler):
+        """Run a handler in-process"""
+        try:
+            self._lastRetVal = handler.handle(self.tree, self, self._lastRetVal)
+            self._gotException = False
+        except Exception, e:
+            self._gotException = True
+            self._lastRetVal = e
+    
+    def _execThreadedHandler(self, handler):
+        """Run a handler out of process with a callback to resume"""
+        checkFunc, initFunc = handler.handle(self.tree, self, self._lastRetVal)
+        self._handlerResumeFunc = handler.resume
+        self.conn.watch_function(checkFunc, self.resume, initFunc)
+    
+    def _execLink(self):
         """Execute a single link in the chain of handlers"""
-        shouldReturn = False
         
-        if self.gotException and errorHandler is not None:
-            nextHandler = errorHandler
-        else:
-            nextHandler = handler
+        handler, errorHandler = self._runningHandlers
         
-        if isinstance(nextHandler, pjs.handlers.base.Handler):
-            # run in-process
-            try:
-                self.lastRetVal = nextHandler.handle(self.tree, self, self.lastRetVal)
-                self.gotException = False
-            except Exception, e:
-                self.gotException = True
-                self.lastRetVal = e
+        if self._gotException:
+            self.lastInPair = True
+            if errorHandler is not None:
+                # executing the error handler
+                if isinstance(errorHandler, pjs.handlers.base.Handler):
+                    self._execHandler(errorHandler)
+                elif isinstance(errorHandler, pjs.handlers.base.ThreadedHandler):
+                    self._execThreadedHandler(errorHandler)
+                    return True
+                else:
+                    logging.warning("Unknown error handler type (%s) for %s",
+                                    type(errorHandler), errorHandler)
+            else:
+                logging.warning("No error handler assigned for %s", handler)
                 
-            if self.gotException and errorHandler is not None:
-                # try the errorHandler in the same link now
-                try:
-                    self.lastRetVal = errorHandler.handle(self.tree, self, self.lastRetVal)
-                    self.getException = False
-                except Exception, e:
-                    self.gotException = True
-                    self.lastRetVal = e
-                
-        elif isinstance(nextHandler, pjs.handlers.base.ThreadedHandler):
-            # run out of process with a callback to resume
-            checkFunc, initFunc = nextHandler.handle(self.tree, self, self.lastRetVal)
-            self.handlerResumeFunc = nextHandler.resume
-            self.conn.watch_function(checkFunc, self.resume, initFunc)
-            shouldReturn = True
+            self._updateRunningHandlers()
         else:
-            logging.warning("Unknown handler type for %s. Type: %s", nextHandler, type(nextHandler))
-        
-        return shouldReturn
+            # executing the normal handler
+            self.lastInPair = False
+            if isinstance(handler, pjs.handlers.base.Handler):
+                self._execHandler(handler)
+                if not self._gotException: # if no exception, we're done with this pair
+                    self.lastInPair = True
+                    self._updateRunningHandlers()
+            elif isinstance(handler, pjs.handlers.base.ThreadedHandler):
+                self._execThreadedHandler(handler)
+                return True
+            else:
+                logging.warning("Unknown handler type (%s) for %s",
+                                type(handler), handler)
+                
+        return False
     
     def setNextHandler(self, handlerName, errorHandlerName=None):
         """Schedules 'handlerName' as the next handler to execute. Optionally,

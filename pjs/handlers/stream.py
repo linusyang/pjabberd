@@ -1,7 +1,8 @@
 import logging
 
-from pjs.handlers.base import Handler
+from pjs.handlers.base import Handler, chainOutput
 from pjs.utils import generateId
+from pjs.elementtree.ElementTree import Element, SubElement
 
 class StreamInitHandler(Handler):
     """Handler for initializing the stream"""
@@ -17,7 +18,7 @@ class StreamInitHandler(Handler):
         else:
             # TODO: send <bad-namespace-prefix/>
             logging.warning("Unknown stream namespace: %s", ns)
-            return
+            return lastRetVal
         
         # TODO: version check
         
@@ -29,6 +30,8 @@ class StreamInitHandler(Handler):
                                    'id' : id
                                    }
         
+        # no one should need to modify this, so we don't pass it along
+        # to the next handler, but just add it to the socket write queue
         msg.addTextOutput(u"<?xml version='1.0'?>" + \
                 "<stream:stream from='%s' id='%s' xmlns='%s' "  \
                     % (msg.conn.server.hostname, id, ns) + \
@@ -61,14 +64,14 @@ class StreamReInitHandler(Handler):
         try:
             if msg.conn.data['tls']['complete']:
                 # TODO: go to features-auth
-                return
+                return lastRetVal
         except KeyError: pass
         
         try:
             if msg.conn.data['sasl']['complete']:
                 msg.setNextHandler('write')
                 msg.setNextHandler('features-postauth')
-                return
+                return lastRetVal
         except KeyError: pass
         
         # TODO: go to features-init
@@ -76,13 +79,13 @@ class StreamReInitHandler(Handler):
 class FeaturesAuthHandler(Handler):
     """Handler for outgoing features after channel encryption."""
     def handle(self, tree, msg, lastRetVal=None):
-        res = u"<stream:features>" + \
-                "<mechanisms xmlns='urn:ietf:params:xml:ns:xmpp-sasl'>" + \
-                "<mechanism>DIGEST-MD5</mechanism>" + \
-                "<mechanism>PLAIN</mechanism>" + \
-                "</mechanisms></stream:features>"
-                
-        msg.addTextOutput(res)
+        res = Element('stream:features')
+        mechs = SubElement(res, 'mechanisms',
+                           {'xmlns' : 'urn:ietf:params:xml:ns:xmpp-sasl'})
+        SubElement(mechs, 'mechanism').text = 'DIGEST-MD5'
+        SubElement(mechs, 'mechanism').text = 'PLAIN'
+        
+        return chainOutput(lastRetVal, res)
         
 # we don't have TLS for now
 FeaturesInitHandler = FeaturesAuthHandler
@@ -90,11 +93,13 @@ FeaturesInitHandler = FeaturesAuthHandler
 class FeaturesPostAuthHandler(Handler):
     """Handler for outgoing features after authentication."""
     def handle(self, tree, msg, lastRetVal=None):
-        res = u"<stream:features><bind xmlns='urn:ietf:params:xml:ns:xmpp-bind'/>" +\
-                "<session xmlns='urn:ietf:params:xml:ns:xmpp-session'/>" +\
-                "</stream:features>"
+        res = Element('stream:features')
+        SubElement(res, 'bind',
+                   {'xmlns' : 'urn:ietf:params:xml:ns:xmpp-bind'})
+        SubElement(res, 'session',
+                   {'xmlns' : 'urn:ietf:params:xml:ns:xmpp-session'})
                 
-        msg.addTextOutput(res)
+        return chainOutput(lastRetVal, res)
 
 class StreamEndHandler(Handler):
     """Handler for closing the stream"""

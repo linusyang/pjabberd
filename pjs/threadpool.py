@@ -78,10 +78,12 @@ class WorkerThread(threading.Thread):
                 # return the work request we just picked up
                 self.workRequestQueue.put(request)
                 break # and exit
-            # XXX catch exceptions here and stick them to request object
-            self.resultQueue.put(
-                (request, request.callable(*request.args, **request.kwds))
-            )
+            try:
+                retVal = request.callable(*request.args, **request.kwds)
+            except Exception, e:
+                retVal = e
+            
+            self.resultQueue.put((request, retVal))
             
             # Wake up asyncore
             # see connection.LocalTriggerConnection.__doc__

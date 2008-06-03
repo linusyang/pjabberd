@@ -98,8 +98,10 @@ class Plain:
                                  'resource' : '',
                                  'in-session' : False
                                  }
-        self.msg.addTextOutput(u"<success xmlns='urn:ietf:params:xml:ns:xmpp-sasl'/>")
         self.msg.conn.parser.resetParser()
+        
+        return Element('success',
+                       {'xmlns' : 'urn:ietf:params:xml:ns:xmpp-sasl'})
 
 class DigestMD5:
     """Implements the DIGEST-MD5 authentication mechanism. Stores state
@@ -147,10 +149,11 @@ class DigestMD5:
             nonce = 'nonce="%s"' % self.nonce
             realm = 'realm="%s"' % self.realm
             
-            msg.addTextOutput(u"<challenge xmlns='urn:ietf:params:xml:ns:xmpp-sasl'>" + \
-                                base64.b64encode(','.join([realm, qop, nonce,
-                                                           charset, algo])) + \
-                                "</challenge>")
+            res = Element('challenge',
+                          {'xmlns' : 'urn:ietf:params:xml:ns:xmpp-sasl'})
+            res.text = base64.b64encode(','.join([realm, qop, nonce, charset, algo]))
+            
+            return res
         elif self.state == DigestMD5.SENT_CHALLENGE1 and data:
             # response to client's reponse (ie. challenge 2)
             try:
@@ -212,9 +215,12 @@ class DigestMD5:
                 
                 self.state = DigestMD5.SENT_CHALLENGE2
                 
-                msg.addTextOutput(u"<challenge xmlns='urn:ietf:params:xml:ns:xmpp-sasl'>" + \
-                                    base64.b64encode(u"rspauth=%s" % rspauth) + \
-                                    "</challenge>")
+                res = Element('challenge',
+                              {'xmlns' : 'urn:ietf:params:xml:ns:xmpp-sasl'})
+                res.text = base64.b64encode(u"rspauth=%s" % rspauth)
+                
+                return res
+                
             else:
                 self._handleFailure()
                 raise SASLAuthError
@@ -229,8 +235,11 @@ class DigestMD5:
                                          'resource' : '',
                                          'in-session' : False
                                          }
-                msg.addTextOutput(u"<success xmlns='urn:ietf:params:xml:ns:xmpp-sasl'/>")
                 msg.conn.parser.resetParser()
+                
+                res = Element('success',
+                              {'xmlns' : 'urn:ietf:params:xml:ns:xmpp-sasl'})
+                return res
             else:
                 self._handleFailure()
                 raise SASLAuthError

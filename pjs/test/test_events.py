@@ -65,7 +65,7 @@ class TestMessagesInProcess(unittest.TestCase):
         msg = pjs.events.Message(None, None, [h], None, None)
         msg.process()
         
-        self.assert_(isinstance(msg.lastRetVal, Exception))
+        self.assert_(isinstance(msg._lastRetVal, Exception))
         
     def testSimpleWithBothInProcess(self):
         h1 = SimpleHandlerWithError()
@@ -88,7 +88,7 @@ class TestMessagesInProcess(unittest.TestCase):
         msg = pjs.events.Message(None, None, [h1, h2], None, None)
         msg.process()
         
-        self.assert_(isinstance(msg.lastRetVal, Exception))
+        self.assert_(isinstance(msg._lastRetVal, Exception))
         
     def testChainedWithReturnValuePassingInProcess(self):
         h1 = ReturnTrueHandler()
@@ -96,13 +96,13 @@ class TestMessagesInProcess(unittest.TestCase):
         msg = pjs.events.Message(None, None, [h1, h2], None, None)
         msg.process()
         
-        self.assert_(msg.lastRetVal == 'success')
+        self.assert_(msg._lastRetVal == 'success')
         
         h1 = SimpleHandler()
         msg = pjs.events.Message(None, None, [h1, h2], None, None)
         msg.process()
         
-        self.assert_(not msg.lastRetVal)
+        self.assert_(not msg._lastRetVal)
         
     def testHandledExceptionInProcess(self):
         h1 = SimpleHandlerWithError()
@@ -111,7 +111,7 @@ class TestMessagesInProcess(unittest.TestCase):
         msg = pjs.events.Message(None, None, [h1], [h2], None)
         msg.process()
         
-        self.assert_(msg.lastRetVal == 'success')
+        self.assert_(msg._lastRetVal == 'success')
         
     def testOneMoreHandlerThanErrorInProcess(self):
         h1 = SimpleHandlerWithError()
@@ -120,7 +120,7 @@ class TestMessagesInProcess(unittest.TestCase):
         msg = pjs.events.Message(None, None, [h1, h2], [h2], None)
         msg.process()
         
-        self.assert_(not msg.lastRetVal)
+        self.assert_(not msg._lastRetVal)
         
 
 

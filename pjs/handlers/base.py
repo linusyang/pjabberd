@@ -55,3 +55,16 @@ def poll(threadpool):
         threadpool.poll()
     except pjs.threadpool.NoResultsPending:
         pass
+    
+def chainOutput(lastRetVal, out):
+    """Attaches out to lastRetVal and returns the result. This is used for
+    chaining return values in handlers. If lastRetVal is not a list, a new list
+    is created with lastRetVal being its first element.
+    """
+    if not isinstance(lastRetVal, list):
+        if lastRetVal is not None:
+            lastRetVal = [lastRetVal]
+        else:
+            lastRetVal = []
+    lastRetVal.append(out)
+    return lastRetVal

@@ -6,18 +6,21 @@ import pjs.sasl_mechanisms as mechs
 import pjs.threadpool as threadpool
 import logging
 
-from pjs.handlers.base import *
+from pjs.handlers.base import Handler, ThreadedHandler, poll, chainOutput
 from pjs.sasl_mechanisms import SASLError
-from pjs.utils import generateId, FunctionCall
-from pjs.elementtree.ElementTree import Element, tostring
+from pjs.utils import FunctionCall
+from pjs.elementtree.ElementTree import Element
 
 class SASLAuthHandler(ThreadedHandler):
     def __init__(self):
+        # this is true when the threaded handler returns
         self.done = False
+        # used to pass the output to the next handler
+        self.retVal = None
+        
     def handle(self, tree, msg, lastRetVal=None):
         """Handles SASL's <auth> element sent from the other side"""
         
-        # this is true when the threaded handler returns
         self.done = False
         
         tpool = msg.conn.server.threadpool
@@ -39,17 +42,22 @@ class SASLAuthHandler(ThreadedHandler):
                 authtext64 = tree[0].text
                 plain = mechs.Plain(msg)
                 msg.conn.data['sasl']['mechObj'] = plain
-                plain.handle(authtext64)
+                return chainOutput(lastRetVal, plain.handle(authtext64))
             elif mech == 'DIGEST-MD5':
                 msg.conn.data['sasl']['mech'] = 'DIGEST-MD5'
                 digest = mechs.DigestMD5(msg)
                 msg.conn.data['sasl']['mechObj'] = digest
-                digest.handle(msg)
+                return chainOutput(lastRetVal, digest.handle(msg))
             else:
                 logging.warning("Mechanism %s not implemented", mech)
             
         def cb(workReq, retVal):
             self.done = True
+            # make sure we pass the lastRetVal along
+            if retVal is None:
+                self.retVal = lastRetVal
+            else:
+                self.retVal = retVal
             
         req = threadpool.makeRequests(act,
                                  [(None, {'tree' : tree, 'msg' : msg})],
@@ -65,15 +73,19 @@ class SASLAuthHandler(ThreadedHandler):
         
         return FunctionCall(checkFunc), FunctionCall(initFunc)
         
-    def resume(self): pass
+    def resume(self):
+        # this is passed to the next handler
+        return self.retVal
         
 class SASLResponseHandler(ThreadedHandler):
     """Handles SASL's <response> element sent from the other side"""
     def __init__(self):
+        # this is true when the threaded handler returns
         self.done = False
+        # used to pass the output to the next handler
+        self.retVal = None
         
     def handle(self, tree, msg, lastRetVal=None):
-        # this is true when the threaded handler returns
         self.done = False
         
         tpool = msg.conn.server.threadpool
@@ -91,12 +103,17 @@ class SASLResponseHandler(ThreadedHandler):
     
             text = tree[0].text
             if text:
-                mech.handle(msg, text.strip())
+                return chainOutput(lastRetVal, mech.handle(msg, text.strip()))
             else:
-                mech.handle(msg, tree)
+                return chainOutput(lastRetVal, mech.handle(msg, tree))
                 
         def cb(workReq, retVal):
             self.done = True
+            # make sure we pass the lastRetVal along
+            if retVal is None:
+                self.retVal = lastRetVal
+            else:
+                self.retVal = retVal
             
         req = threadpool.makeRequests(act,
                                  [(None, {'tree' : tree, 'msg' : msg})],
@@ -112,8 +129,9 @@ class SASLResponseHandler(ThreadedHandler):
         
         return FunctionCall(checkFunc), FunctionCall(initFunc)
     
-    def resume(self): pass
-        
+    def resume(self):
+        return self.retVal
+
         
 class SASLErrorHandler(Handler):
     def handle(self, tree, msg, lastRetVal=None):
@@ -121,7 +139,7 @@ class SASLErrorHandler(Handler):
             el = Element('failure', {'xmlns' : 'urn:ietf:params:xml:ns:xmpp-sasl'})
             el.append(lastRetVal.errorElement())
             
-            msg.addTextOutput(tostring(el))
+            return chainOutput(lastRetVal, el)
         else:
             logging.warning("SASLErrorHandler was passed a non-SASL exception")
             raise Exception, "can't handle a non-SASL error"

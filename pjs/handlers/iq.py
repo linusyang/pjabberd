@@ -1,6 +1,6 @@
 import logging
 
-from pjs.handlers.base import Handler
+from pjs.handlers.base import Handler, chainOutput
 from pjs.elementtree.ElementTree import Element, SubElement
 from pjs.utils import tostring, generateId
 
@@ -28,9 +28,11 @@ class IQBindHandler(Handler):
             bind.append(jid)
             res.append(bind)
             
-            return tostring(res)
+            return chainOutput(lastRetVal, res)
         else:
             logging.warning("No id in <iq>:\n%s", tostring(iq))
+            
+        return lastRetVal
         
 class IQSessionHandler(Handler):
     """Handles session establishment"""
@@ -43,7 +45,7 @@ class IQSessionHandler(Handler):
         
         msg.conn.data['user']['in-session'] = True
         
-        return tostring(res)
+        return chainOutput(lastRetVal, res)
 
 class IQNotImplementedHandler(Handler):
     """Handler that replies to unknown iq stanzas"""
@@ -69,6 +71,8 @@ class IQNotImplementedHandler(Handler):
             
             res.append(err)
             
-            return tostring(res)
+            return chainOutput(lastRetVal, res)
         else:
             logging.warning("No id in <iq>:\n%s", tostring(origIQ))
+        
+        return lastRetVal
