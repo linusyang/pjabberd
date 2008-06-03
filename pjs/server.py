@@ -5,16 +5,22 @@ import socket
 import logging
 import os, os.path, sys
 
-from pjs.connection import Connection, LocalTriggerConnection
+from pjs.connection import Connection, LocalTriggerConnection, LocalS2SConnection
 from pjs.async.core import dispatcher
+from pjs.jid import JID
+from pjs.router import Router
 from pjs.db import DB, sqlite
 
 class Server(dispatcher):
     def __init__(self, ip, port):
         dispatcher.__init__(self)
         # maintains a mapping of connection ids to connections
-        # {connId => Connection}
+        # this includes both c2s and s2s connections
+        # {connId => (JID, Connection)}
         self.conns = {}
+        # {'domain' => (<Connection> for in, <Connection> for out)}
+        self.s2sConns = {}
+        
         self.ip = ip
         self.hostname = ip
         self.port = port
@@ -24,10 +30,10 @@ class Server(dispatcher):
         self.listen(5)
         
         # see connection.LocalTriggerConnection.__doc__
-        self.localConn = LocalTriggerConnection(self.ip, self.port)
+        self.triggerConn = LocalTriggerConnection(self.ip, self.port)
         
         def notifyFunc():
-            self.localConn.send(' ')
+            self.triggerConn.send(' ')
         
         # TODO: make this configurable
         self.threadpool = threadpool.ThreadPool(5, notifyFunc=notifyFunc)
@@ -45,11 +51,12 @@ class Server(dispatcher):
     def handle_accept(self):
         sock, addr = self.accept()
         conn = Connection(sock, addr, self)
-        self.conns[conn.id] = conn
+        # we don't know the JID until client logs in
+        self.conns[conn.id] = (None, conn)
         
     def handle_close(self):
         for c in self.conns:
-            c.handle_close()
+            c[1].handle_close()
         self.close()
         
 if __name__ == '__main__':
@@ -118,6 +125,14 @@ if __name__ == '__main__':
     s = Server('localhost', 5222)
     
     pjs.conf.conf.server = s
+    
+    # create local s2s connection
+    locCon = LocalS2SConnection(s)
+    locCon.data['stream']['type'] = 's2s'
+    pjs.conf.conf.localConn = locCon
+    
+    # create the router
+    pjs.conf.conf.router = Router(s.hostname)
     
     logging.info('server started')
     

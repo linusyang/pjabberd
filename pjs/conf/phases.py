@@ -62,49 +62,66 @@ corePhases = {
                     }
           }
 
-# XMPP stanzas (iq/presence/message)
-stanzaPhases = {
-                'default' : {
-                             'description' : 'default phase for when no other matches'
-                             }, 
-                'iq-bind' : {
-                             'description' : 'client binding a resource', 
-                             'xpath' : "{jabber:client}iq[@type='set']/{urn:ietf:params:xml:ns:xmpp-bind}bind", 
-                             'handlers' : [h['iq-bind'], h['write']]
-                             },
-                'iq-session' : {
-                                'description' : 'client binding a session',
-                                'xpath' : "{jabber:client}iq[@type='set']/{urn:ietf:params:xml:ns:xmpp-session}session",
-                                'handlers' : [h['iq-session'], h['write']]
-                                },
-                'iq-roster-get' : {
-                                   'description' : 'client requesting their roster',
-                                   'xpath' : "{jabber:client}iq[@type='get']/{jabber:iq:roster}query",
-                                   'handlers' : [h['iq-roster-get'], h['write']]
-                                   },
-                'iq-roster-update' : {
-                                      'description' : 'client adding or updating their roster',
-                                      'xpath' : "{jabber:client}iq[@type='set']/{jabber:iq:roster}query",
-                                      'handlers' : [h['iq-roster-update'], h['write']]
-                                      },
-                'iq-disco-items' : {
-                                    'description' : 'discovery',
-                                    'xpath' : "{jabber:client}iq[@type='get']/{http://jabber.org/protocol/disco#items}query",
-                                    'handlers' : [h['iq-not-implemented'], h['write']]
-                                    },
-                'iq-disco-info' : {
-                                   'description' : 'server info',
-                                   'xpath' : "{jabber:client}iq[@type='get']/{http://jabber.org/protocol/disco#info}query",
-                                   'handlers' : [h['iq-not-implemented'], h['write']]
-                                   },
-                'message' : {
-                             'description' : 'incoming message stanza',
-                             'xpath' : '{jabber:client}message',
-                             'handlers' : []
-                             },
-                'presence' : {
-                              'description' : 'incoming presence stanza',
-                              'xpath' : '{jabber:client}presence',
-                              'handlers' : []
-                              }
-                }
+# XMPP stanzas for client-to-server (iq/presence/message)
+c2sStanzaPhases = {
+    'default' : {
+                 'description' : 'default phase for when no other matches'
+                 }, 
+    'iq-bind' : {
+                 'description' : 'client binding a resource', 
+                 'xpath' : "{jabber:client}iq[@type='set']/{urn:ietf:params:xml:ns:xmpp-bind}bind", 
+                 'handlers' : [h['iq-bind'], h['write']]
+                 },
+    'iq-session' : {
+                    'description' : 'client binding a session',
+                    'xpath' : "{jabber:client}iq[@type='set']/{urn:ietf:params:xml:ns:xmpp-session}session",
+                    'handlers' : [h['iq-session'], h['write']]
+                    },
+    'iq-roster-get' : {
+                       'description' : 'client requesting their roster',
+                       'xpath' : "{jabber:client}iq[@type='get']/{jabber:iq:roster}query",
+                       'handlers' : [h['iq-roster-get'], h['write']]
+                       },
+    'iq-roster-update' : {
+                          'description' : 'client adding or updating their roster',
+                          'xpath' : "{jabber:client}iq[@type='set']/{jabber:iq:roster}query",
+                          'handlers' : [h['iq-roster-update'], h['write']]
+                          },
+    'iq-disco-items' : {
+                        'description' : 'discovery',
+                        'xpath' : "{jabber:client}iq[@type='get']/{http://jabber.org/protocol/disco#items}query",
+                        'handlers' : [h['iq-not-implemented'], h['write']]
+                        },
+    'iq-disco-info' : {
+                       'description' : 'server info',
+                       'xpath' : "{jabber:client}iq[@type='get']/{http://jabber.org/protocol/disco#info}query",
+                       'handlers' : [h['iq-not-implemented'], h['write']]
+                       },
+    'message' : {
+                 'description' : 'incoming message stanza',
+                 'xpath' : '{jabber:client}message',
+                 'handlers' : []
+                 },
+#    'presence' : {
+#                  'description' : 'incoming presence stanza',
+#                  'xpath' : '{jabber:client}presence',
+#                  'handlers' : []
+#                  },
+    'subscription' : {
+                      'description' : 'subscription handling',
+                      'xpath' : "{jabber:client}presence[@type]",
+                      'handlers' : [h['subscription']]
+                      }
+    }
+
+# XMPP stanzas for server-to-server
+s2sStanzaPhases = {
+    'default' : {
+                 'description' : 'default phase for when no other matches'
+                 },
+    'subscription' : {
+                      'description' : 'subscription handling',
+                      'xpath' : "{jabber:server}presence[@type]",
+                      'handlers' : []
+                      }
+    }

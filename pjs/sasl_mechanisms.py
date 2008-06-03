@@ -5,6 +5,7 @@ import re
 from pjs.db import DB
 from pjs.utils import generateId
 from pjs.elementtree.ElementTree import Element
+from pjs.jid import JID
 
 try:
     # python >= 2.5
@@ -99,6 +100,11 @@ class Plain:
                                  'resource' : '',
                                  'in-session' : False
                                  }
+        
+        # record the JID for local delivery
+        self.msg.conn.server.conns[self.msg.conn.id] = (JID(self.msg.conn.data['user']['jid']),
+                                                        self.msg.conn)
+        
         self.msg.conn.parser.resetParser()
         
         return Element('success',
@@ -122,6 +128,7 @@ class DigestMD5:
         self.nonce = None
         self.nc = 0x0
         self.realm = msg.conn.server.hostname
+        self.msg = msg
         self.username = None
         self.failures = 0
         self.state = DigestMD5.INIT
@@ -236,6 +243,11 @@ class DigestMD5:
                                          'resource' : '',
                                          'in-session' : False
                                          }
+                
+                # record the JID for local delivery
+                self.msg.conn.server.conns[self.msg.conn.id] = (JID(self.msg.conn.data['user']['jid']),
+                                                                self.msg.conn)
+                
                 msg.conn.parser.resetParser()
                 
                 res = Element('success',

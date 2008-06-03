@@ -26,6 +26,11 @@ class IQBindHandler(Handler):
             # TODO: check that we don't already have such a resource
             
             msg.conn.data['user']['resource'] = resource
+            
+            # record the resource in the JID object of the (JID, Connection) pair
+            # this is for local delivery lookups
+            msg.conn.server.conns[msg.conn.id][0].resource = resource
+            
             jid = msg.conn.data['user']['jid']
             
             # save the jid/resource in the server's global storage

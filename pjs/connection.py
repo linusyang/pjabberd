@@ -3,9 +3,39 @@ import pjs.parsers as parsers
 import logging
 import socket
 
-from tlslite.integration.TLSAsyncDispatcherMixIn import TLSAsyncDispatcherMixIn
+from pjs.elementtree.ElementTree import Element
+#from tlslite.integration.TLSAsyncDispatcherMixIn import TLSAsyncDispatcherMixIn
+
+def initData():
+    """Creates the default per-connection data"""
+    data = {}
+    data['stream'] = {
+                      'in-stream' : False, # False before <stream> sent and after </stream>
+                      'type' : 'c2s',
+                      'id' : '',
+                      }
+    data['sasl'] = {
+                    'mech' : 'DIGEST-MD5', # or PLAIN
+                    'mechObj' : None, # <reference to one of SASL mech objects>
+                    'complete' : False,
+                    }
+    data['tls'] = {
+                   'enabled' : False,
+                   'complete' : False,
+                   }
+    data['user'] = {
+                    'jid' : '',
+                    'resource' : '',
+                    'in-session' : False, # True if <session> sent/accepted
+                    'requestedRoster' : False, # True when sent the roster iq get
+                                               # when False, we shouldn't send it presence
+                                               # updates
+                    }
+    
+    return data
 
 class Connection(asyncore.dispatcher_with_send):
+    """Connection initiated by the other party"""
     def __init__(self, sock, addr, server):
         asyncore.dispatcher_with_send.__init__(self, sock)
         self.sock = sock
@@ -15,35 +45,13 @@ class Connection(asyncore.dispatcher_with_send):
         
         self.parser = parsers.borrow_parser(self)
         
-        # any sort of per-connection data. can be accessed by handlers.
-        self.data = {}
-        self.data['stream'] = {
-                               'in-stream' : False, # False before <stream> sent and after </stream>
-                               'type' : 'c2s',
-                               'id' : '',
-                               }
-        self.data['sasl'] = {
-                             'mech' : 'DIGEST-MD5', # or PLAIN
-                             'mechObj' : None, # <reference to one of SASL mech objects>
-                             'complete' : False,
-                             }
-        self.data['tls'] = {
-                            'enabled' : False,
-                            'complete' : False,
-                            }
-        self.data['user'] = {
-                             'jid' : '',
-                             'resource' : '',
-                             'in-session' : False, # True if <session> sent/accepted
-                             'requestedRoster' : False, # True when sent the roster iq get
-                                                        # when False, we shouldn't send it presence
-                                                        # updates
-                             }
+        # per-connection data. can be accessed by handlers.
+        self.data = initData()
         
         logging.info("New connection accepted from %s", self.addr)
         
     def handle_expt(self):
-        logging.warning("Socket exception occured for %s", self.addr)
+        logging.warning("Socket exception occurred for %s", self.addr)
         self.handle_close()
     
     def handle_close(self):
@@ -62,6 +70,47 @@ class Connection(asyncore.dispatcher_with_send):
         
     def handle_read(self):
         data = self.recv(4096)
+        self.parser.feed(data)
+
+class LocalS2SConnection(Connection):
+    """Fake local connection for faster message processing between two
+    JIDs on our server.
+    """
+    def __init__(self, server):
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.connect(('localhost', 5222))
+        Connection.__init__(self, s, s.getsockname(), server)
+        
+        p = self.parser._parser
+        
+        # fake the <stream> header
+        p.StartElementHandler = None
+        p.EndElementHandler = None
+        p.CharacterDataHandler = None
+        p.StartNamespaceDeclHandler = None
+        
+        stream = "<stream:stream xmlns='jabber:server' " +\
+              "xmlns:stream='http://etherx.jabber.org/streams' " +\
+              "from='%s' id='local' version='1.0'>" % (server.hostname)
+        self.feed(stream)
+        
+        # record so that xpath queries work
+        self.parser.stream = Element('{http://etherx.jabber.org/streams}stream',
+                                     {
+                                      'from' : server.hostname,
+                                      'id' : 'local',
+                                      'version' : '1.0'
+                                      })
+        
+        # reinstate the handlers
+        p.StartElementHandler = self.parser.handle_start
+        p.EndElementHandler = self.parser.handle_end
+        p.CharacterDataHandler = self.parser.handle_text
+        p.StartNamespaceDeclHandler = self.parser.handle_ns
+        
+        #self.send = self.feed
+        
+    def feed(self, data):
         self.parser.feed(data)
 
 class LocalTriggerConnection(asyncore.dispatcher_with_send):

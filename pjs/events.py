@@ -2,7 +2,7 @@ import pjs.handlers.base
 import pjs.conf.conf
 import logging
 
-from pjs.conf.phases import corePhases, stanzaPhases
+from pjs.conf.phases import corePhases, c2sStanzaPhases, s2sStanzaPhases
 from pjs.conf.handlers import handlers as h
 from pjs.handlers.write import prepareDataForSending
 from Queue import Queue, Empty
@@ -206,7 +206,7 @@ def pickupResults():
     """
     try:
         connId, out = resultQ.get_nowait()
-        conn = pjs.conf.conf.server.conns[connId]
+        conn = pjs.conf.conf.server.conns[connId][1]
         conn.send(prepareDataForSending(out))
         del _runningMessages[connId]
     except Empty:
@@ -278,11 +278,20 @@ class _Dispatcher(object):
 _dispatcher = _Dispatcher()
 def Dispatcher(): return _dispatcher
 
-class _StanzaDispatcher(_Dispatcher):
-    """Stanza-specific dispatcher"""
+class _C2SStanzaDispatcher(_Dispatcher):
+    """C2S Stanza-specific dispatcher"""
     
     def __init__(self):
-        self.phasesList = stanzaPhases
+        self.phasesList = c2sStanzaPhases
 
-_stanzaDispatcher = _StanzaDispatcher()
-def StanzaDispatcher(): return _stanzaDispatcher
+_c2sStanzaDispatcher = _C2SStanzaDispatcher()
+def C2SStanzaDispatcher(): return _c2sStanzaDispatcher
+
+class _S2SStanzaDispatcher(_Dispatcher):
+    """S2S Stanza-specific dispatcher"""
+    
+    def __init__(self):
+        self.phasesList = s2sStanzaPhases
+        
+_s2sStanzaDispatcher = _S2SStanzaDispatcher()
+def S2SStanzaDispatcher(): return _s2sStanzaDispatcher

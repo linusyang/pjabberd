@@ -5,6 +5,7 @@ import pjs.handlers.simple
 import pjs.handlers.stream
 import pjs.handlers.iq
 import pjs.handlers.sasl
+import pjs.handlers.presence
 
 # TODO: add functions to fetch handlers from the config file
 
@@ -78,5 +79,9 @@ handlers = {
                              'handler' : pjs.handlers.iq.RosterPushHandler,
                              'description' : 'uses the last return value to push ' +\
                                              'the roster change to all connected resources'
-                             }
+                             },
+            'subscription' : {
+                              'handler' : pjs.handlers.presence.SubscriptionHandler,
+                              'description' : 'takes care of subscriptions'
+                              }
             }

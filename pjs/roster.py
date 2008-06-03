@@ -38,26 +38,26 @@ class Roster:
         """
         c = DB().cursor()
         
-        c.execute("SELECT contactid, name, subscription FROM roster\
-                   WHERE userid = ?", (self.uid,))
+        c.execute("SELECT roster.contactid, roster.name, roster.subscription\
+                   FROM roster\
+                       JOIN jids ON jids.id = roster.contactid\
+                   WHERE userid = ? AND jids.jid = ?", (self.uid, cjid))
         res = c.fetchone()
         if res:
             cid = res[0]
             name = res[1]
-            sub = Subscription.getPrimaryNameFromState(res[2])
+            sub = res[2]
         else:
             c.close()
             return False
         
         if includeGroups:
             # get the groups
-            groups = []
             c.execute("SELECT rgs.name\
                        FROM rostergroups AS rgs\
                            JOIN rostergroupitems AS rgi ON rgi.groupid = rgs.groupid\
                        WHERE rgs.userid = ? AND rgi.contactid = ?", (self.uid, cid))
-            for group in c:
-                groups.append(group)
+            groups = [group['name'] for group in c]
                 
             return RosterItem(cjid, name, sub, groups, cid)
         else:
@@ -173,6 +173,15 @@ class Roster:
         
         return cid
         
+    def setSubscription(self, cid, sub):
+        """Sets the subscription from the perspective of this user to a
+        contact with ID cid to sub, which is an id retrieved via the
+        Subscription class.
+        """
+        c = DB().cursor()
+        c.execute("UPDATE roster SET subscription = ?\
+                   WHERE userid = ? AND contactid = ?", (sub, self.uid, cid))
+        c.close()
     
     def getSubPrimaryName(self, cid):
         """Gets the primary name of a subscription for this user and this
@@ -204,10 +213,10 @@ class Roster:
                        JOIN jids AS contactjids ON roster.contactid = contactjids.id\
                    WHERE userjids.jid = ?", (self.jid,))
         
+        self.items = {}
         for row in c:
             self.addItem(row['contactid'],
-                         RosterItem(row['cjid'], row['name'],
-                                    Subscription.getPrimaryNameFromState(row['subscription'])))
+                         RosterItem(row['cjid'], row['name'], row['subscription']))
         
         # get the groups now for each cid
         c.execute("SELECT rgi.contactid, rgs.name\
@@ -235,19 +244,19 @@ class RosterItem:
         """Creates a new RosterItem.
         All attributes are optional and only the jid and subscription are
         required for meaningful use in a roster send. id is the contact's id
-        in the database.
+        in the database. Subscription is the subscription id in the DB.
         """
         self.id = id
         self.jid = jid
         self.name = name
-        self.subscription = subscription
+        self.subscription = subscription # id, not name
         self.groups = groups or []
         
     def getAsTree(self):
         """Return the roster item as an Element tree starting from <item>"""
         item = Element('item', {
                                 'jid' : self.jid,
-                                'subscription' : self.subscription
+                                'subscription' : Subscription.getPrimaryNameFromState(self.subscription)
                                 })
         if self.name:
             item.set('name', self.name)

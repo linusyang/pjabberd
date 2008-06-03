@@ -1,7 +1,7 @@
 """ XML Stream parsers """
 
 from xml.parsers import expat
-from pjs.events import Dispatcher, StanzaDispatcher
+from pjs.events import Dispatcher, C2SStanzaDispatcher, S2SStanzaDispatcher
 from copy import deepcopy
 import pjs.elementtree.ElementTree as et
 import re
@@ -18,7 +18,8 @@ class IncrStreamParser:
     close() is called, it will throw a xml.parsers.expat.ExpatError.
     """
     
-    stanzaRe = re.compile(r'\b(iq|message|presence)\b', re.U | re.I)
+    c2sStanzaRe = re.compile(r'{jabber:client}\b(iq|message|presence)\b', re.U | re.I)
+    s2sStanzaRe = re.compile(r'{jabber:server}\b(iq|message|presence)\b', re.U | re.I)
 
     def __init__(self, conn=None):
         self.conn = conn
@@ -127,8 +128,10 @@ class IncrStreamParser:
             # in the <stream> element first
             tree = deepcopy(self.stream)
             tree.append(self.tree)
-            if IncrStreamParser.stanzaRe.search(self.tree.tag):
-                StanzaDispatcher().dispatch(tree, self.conn)
+            if IncrStreamParser.c2sStanzaRe.search(self.tree.tag):
+                C2SStanzaDispatcher().dispatch(tree, self.conn)
+            elif IncrStreamParser.s2sStanzaRe.search(self.tree.tag):
+                S2SStanzaDispatcher().dispatch(tree, self.conn)
             else:
                 Dispatcher().dispatch(tree, self.conn)
         else:
