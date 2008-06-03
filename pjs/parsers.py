@@ -3,6 +3,11 @@
 from xml.parsers import expat
 import pjs.elementtree.ElementTree as et
 
+def borrow_parser(conn):
+    """Borrow a parser from a pool of parsers"""
+    # TODO: implement the pool. For now just return a new parser
+    return IncrStreamParser(conn)
+
 class IncrStreamParser:
     """Pass it unicode strings via feed() and it will buffer the input until it
     can parse a chunk. When it can, it dispatches the right event. Don't forget
