@@ -106,6 +106,11 @@ _c2sStanzaPhases = {
                           'xpath' : "{jabber:client}iq[@type='set']/{jabber:iq:roster}query",
                           'handlers' : [h['iq-roster-update'], h['write']]
                           },
+    'iq-register' : {
+                          'description' : 'client registering their roster',
+                          'xpath' : "{jabber:client}iq[@type='set']/{jabber:iq:register}query",
+                          'handlers' : [h['iq-register'], h['write']]
+                          },
     'iq-disco-items' : {
                         'description' : 'discovery',
                         'xpath' : "{jabber:client}iq[@type='get']/{http://jabber.org/protocol/disco#items}query",

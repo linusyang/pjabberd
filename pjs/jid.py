@@ -1,5 +1,6 @@
 import re
 from pjs.db import DBautocommit
+import logging
 
 class JID:
     """Models a JID"""
@@ -8,10 +9,24 @@ class JID:
     # RFC 3920 section 3.1.
     jidre = re.compile(r'((\w*)@)?([\w.]+)(/(.+))?', re.I)
     
-    def __init__(self, jid):
+    def __init__(self, jid, use_id=False):
         """Tries to create a JID out of 'jid'. Raises an exception if the JID
         is malformed.
         """
+        if use_id:
+            jid_number = jid
+            res = None
+            try:
+                c = DBautocommit().cursor()
+                c.execute("SELECT jid FROM jids WHERE id = %d" %
+                          (jid_number))
+                res = c.fetchone()
+            except:
+                logging.debug('JID: init from number failed')
+            if res and len(res) > 0:
+                jid = res[0]
+            else:
+                jid = ''
         m = JID.jidre.match(jid)
         if not m:
             raise Exception, '[JID] %s is not a proper JID' % jid
@@ -22,13 +37,32 @@ class JID:
         
     def getBare(self):
         return '%s@%s' % (self.node, self.domain)
+
+    def getNumId(self):
+        """Returns this JID's database numeric ID"""
+        res = None
+        try:
+            c = DBautocommit().cursor()
+            c.execute("SELECT id FROM jids WHERE jid = ?",
+                      (self.getBare(),))
+            res = c.fetchone()
+        except:
+            logging.debug('JID: get numeric ID failed')
+        if res and len(res) > 0:
+            return res[0]
+        else:
+            return -1
     
     def exists(self):
         """Returns True if this JID exists in the DB"""
-        c = DBautocommit().cursor()
-        c.execute("SELECT jid FROM jids WHERE jid = ? AND password != ''",
-                  (self.getBare(),))
-        res = c.fetchone()
+        res = None
+        try:
+            c = DBautocommit().cursor()
+            c.execute("SELECT jid FROM jids WHERE jid = ? AND password != ''",
+                      (self.getBare(),))
+            res = c.fetchone()
+        except:
+            logging.debug('JID: check existence failed')
         if res:
             return True
         else:

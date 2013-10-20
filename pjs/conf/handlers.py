@@ -92,6 +92,10 @@ handlers = {
                                   'handler' : pjs.handlers.iq.IQRosterUpdateHandler,
                                   'description' : 'handles roster add/update requests'
                                   },
+            'iq-register' : {
+                                  'handler' : pjs.handlers.iq.IQRegisterHandler,
+                                  'description' : 'handles roster register requests'
+                                  },
             'roster-push' : {
                              'handler' : pjs.handlers.iq.RosterPushHandler,
                              'description' : 'uses the last return value to push ' +\

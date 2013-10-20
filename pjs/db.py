@@ -3,9 +3,9 @@ This can be replaced by rewriting the relevant classes and using them
 in your own custom handlers.
 """
 
-from pysqlite2 import dbapi2 as sqlite
+import sqlite3 as sqlite
 
-dbname = 'db'
+dbname = 'storage.db'
 
 def DB(name=None, isolationLevel="DEFERRED"):
     """Connects to the database and returns the connection. Uses the default
@@ -20,7 +20,7 @@ def DB(name=None, isolationLevel="DEFERRED"):
         n = dbname
     else:
         n = dbname = name
-    db = sqlite.connect(n, timeout=10.0, isolation_level=isolationLevel)
+    db = sqlite.connect(n, timeout=10.0, isolation_level=isolationLevel, detect_types=sqlite.PARSE_DECLTYPES)
     # allows us to select by column name instead of just by index
     db.row_factory = sqlite.Row
     return db

@@ -1,8 +1,14 @@
 """Main module for starting the server"""
 
+import os, sys
+reload(sys)
+now_path = os.path.dirname(os.path.realpath(__file__))
+lib_path = os.path.abspath(os.path.join(now_path, '..'))
+sys.path.append(lib_path)
+sys.setdefaultencoding('utf-8')
+
 import pjs.conf.conf
 import logging
-import os, os.path, sys
 
 from pjs.db import DB, sqlite
 
@@ -65,29 +71,34 @@ def populateDB():
     con = DB()
     c = con.cursor()
     try:
-        c.execute("CREATE TABLE jids (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,\
+        c.execute("CREATE TABLE IF NOT EXISTS jids (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,\
                                         jid TEXT NOT NULL,\
                                         password TEXT NOT NULL,\
                                         UNIQUE(jid))")
-        c.execute("CREATE TABLE roster (userid INTEGER REFERENCES jids NOT NULL,\
+        c.execute("CREATE TABLE IF NOT EXISTS roster (userid INTEGER REFERENCES jids NOT NULL,\
                                         contactid INTEGER REFERENCES jids NOT NULL,\
                                         name TEXT,\
                                         subscription INTEGER DEFAULT 0,\
                                         PRIMARY KEY (userid, contactid)\
                                         )")
-        c.execute("CREATE TABLE rostergroups (groupid INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,\
+        c.execute("CREATE TABLE IF NOT EXISTS offline (fromid INTEGER REFERENCES jids NOT NULL,\
+                                        toid INTEGER REFERENCES jids NOT NULL,\
+                                        time TIMESTAMP,\
+                                        content TEXT\
+                                        )")
+        c.execute("CREATE TABLE IF NOT EXISTS rostergroups (groupid INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,\
                                               userid INTEGER REFERENCES jids NOT NULL,\
                                               name TEXT NOT NULL,\
                                               UNIQUE(userid, name)\
                                               )")
-        c.execute("CREATE TABLE rostergroupitems\
+        c.execute("CREATE TABLE IF NOT EXISTS rostergroupitems\
                     (groupid INTEGER REFERENCES rostergroup NOT NULL,\
                      contactid INTEGER REFERENCES jids NOT NULL,\
                      PRIMARY KEY (groupid, contactid))")
-        c.execute("INSERT INTO jids (jid, password) VALUES ('tro@localhost', 'test')")
-        c.execute("INSERT INTO jids (jid, password) VALUES ('dv@localhost', 'test')")
-        c.execute("INSERT INTO jids (jid, password) VALUES ('bob@localhost', 'test')")
-        c.execute("INSERT INTO jids (jid, password) VALUES ('alice@localhost', 'test')")
+        c.execute("INSERT OR IGNORE INTO jids (jid, password) VALUES ('foo@localhost', 'foo')")
+        c.execute("INSERT OR IGNORE INTO jids (jid, password) VALUES ('bar@localhost', 'bar')")
+        c.execute("INSERT OR IGNORE INTO jids (jid, password) VALUES ('test@localhost', 'test')")
+        c.execute("INSERT OR IGNORE INTO jids (jid, password) VALUES ('admin@localhost', 'admin')")
         con.commit()
 #        c.execute("INSERT INTO roster (userid, contactid, subscription) VALUES (1, 2, 8)")
 #        c.execute("INSERT INTO roster (userid, contactid, subscription) VALUES (2, 1, 8)")
@@ -96,7 +107,7 @@ def populateDB():
 #        c.execute("INSERT INTO rostergroupitems (groupid, contactid) VALUES (1, 2)")
     except sqlite.OperationalError, e:
         if e.message.find('already exists') >= 0: pass
-        else: raise
+        else: raise e
     c.close()
 
 if __name__ == '__main__':

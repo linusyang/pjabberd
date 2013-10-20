@@ -2,9 +2,12 @@
 
 import logging
 import pjs.threadpool as threadpool
+from pjs.db import DB, sqlite
+from contextlib import closing
+from datetime import datetime
 
 from pjs.handlers.base import ThreadedHandler, Handler, chainOutput, poll
-from pjs.elementtree.ElementTree import Element
+from pjs.elementtree.ElementTree import Element, SubElement
 from pjs.utils import FunctionCall, tostring
 from pjs.roster import Roster, Subscription
 from pjs.jid import JID
@@ -42,6 +45,8 @@ class C2SPresenceHandler(ThreadedHandler):
             presTree.set('from', '%s/%s' % (jid, resource))
 
             probes = []
+            init_rosters = []
+            offline_msgs = []
             if tree.get('to') is None and not d['user']['active']:
                 # initial presence
                 # TODO: we don't need to do it every time. we can cache the
@@ -67,6 +72,62 @@ class C2SPresenceHandler(ThreadedHandler):
                                       }
                     probes.append(probeRouteData)
                     # they're sent first. see below
+
+                # send initial roster list to this user
+                rosterTree = Element('presence', {
+                                                 'type': 'unavailable',
+                                                 'to' : '%s/%s' \
+                                                    % (jid, resource)
+                                                 })
+                for cjid in cjids:
+                    rosterTree.set('from', cjid)
+                    rosterRouterData = {
+                                           'to' : '%s/%s' % (jid, resource),
+                                           'data' : deepcopy(rosterTree)
+                                       }
+                    init_rosters.append(rosterRouterData)
+
+                # send offline message to this user
+                try:
+                    con = DB()
+                    result = []
+                    to_jid = JID(jid)
+                    with closing(con.cursor()) as cursor:
+                        cursor.execute("SELECT fromid, time, content FROM offline WHERE toid = %d ORDER BY time DESC" %
+                                       (to_jid.getNumId()))
+                        con.commit()
+                        result = cursor.fetchall()
+                    with closing(con.cursor()) as cursor:
+                        cursor.execute("DELETE FROM offline WHERE toid = %d" %
+                                       (to_jid.getNumId()))
+                        con.commit()
+                    for fromid, time, content in result:
+                        fromJID = JID(fromid, True).getBare()
+                        toJID = '%s/%s' % (jid, resource)
+
+                        reply = Element('message', {
+                            'to': toJID,
+                            'from': fromJID
+                        })
+
+                        body = Element('body')
+                        body.text = content
+                        reply.append(body)
+
+                        delay = Element('delay', {
+                            'xmlns': 'urn:xmpp:delay',
+                            'from': fromJID,
+                            'stamp': time.strftime("%Y-%m-%dT%H:%M:%SZ")
+                        })
+                        reply.append(delay)
+
+                        routeData = {
+                            'to' : toJID,
+                            'data': reply
+                        }
+                        offline_msgs.append(routeData)
+                except Exception as e:
+                    logging.warning("[%s] Failed to read offline messages: %s", self.__class__, str(e))
 
                 # broadcast to other resources of this user
                 retVal = self.broadcastToOtherResources(presTree, msg, retVal, jid, resource)
@@ -103,6 +164,16 @@ class C2SPresenceHandler(ThreadedHandler):
             for probe in probes:
                 msg.setNextHandler('route-server')
                 retVal = chainOutput(retVal, probe)
+
+            # send initial rosters
+            for init_roster in init_rosters:
+                msg.setNextHandler('route-client')
+                retVal = chainOutput(retVal, init_roster)
+
+            # send offline messages
+            for offline_msg in offline_msgs:
+                msg.setNextHandler('route-client')
+                retVal = chainOutput(retVal, offline_msg)
 
             return retVal
 

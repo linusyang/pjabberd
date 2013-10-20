@@ -1,7 +1,10 @@
 """<iq>-related handlers"""
 
 import logging
+import re
+from contextlib import closing
 import pjs.threadpool as threadpool
+from pjs.db import DB, sqlite
 
 from pjs.handlers.base import ThreadedHandler, Handler, chainOutput, poll
 from pjs.roster import Roster
@@ -380,6 +383,81 @@ class RosterPushHandler(ThreadedHandler):
     def resume(self):
         # this is passed to the next handler
         return self.retVal
+
+class IQRegisterHandler(Handler):
+    """Responds to a roster iq register request"""
+    def handle(self, tree, msg, lastRetVal=None):
+
+        # generate error response tree
+        def get_error_tree(iq, type, code, tag):
+            result = Element('iq', {'type': 'error', 'id': iq.get('id')})
+            result.append(iq)
+            err_tree = Element('error', {'type': type, 'code': code,})
+            SubElement(err_tree, tag, {'xmlns': 'urn:ietf:params:xml:ns:xmpp-stanzas'})
+            result.append(err_tree)
+            return result
+
+        if len(tree) > 0:
+            # get the original iq msg
+            origIQ = tree
+        else:
+            logging.warning("[%s] Original <iq> missing:\n%s",
+                            self.__class__, tostring(tree))
+            return lastRetVal
+
+        id = origIQ.get('id')
+        if id:
+            try:
+                username_tree = origIQ[0][0]
+                password_tree = origIQ[0][1]
+                if username_tree.tag == '{jabber:iq:register}username' and password_tree.tag == '{jabber:iq:register}password':
+                    username = username_tree.text
+                    password = password_tree.text
+
+                    # ruling out illegal username
+                    if not re.match("^[a-zA-Z0-9_.-]+$", username):
+                        raise Exception('Username not accepted')
+
+                    # write to database
+                    try:
+                        con = DB()
+                        with closing(con.cursor()) as cursor:
+                            cursor.execute("INSERT INTO jids (jid, password) VALUES ('%s@%s', '%s')" %
+                                           (username, msg.conn.server.hostname, password))
+                            con.commit()
+                        res = Element('iq', {'type': 'result', 'id': id})
+                        query = deepcopy(origIQ[0])
+                        query.insert(0, Element('registered'))
+                        res.append(query)
+                        return chainOutput(lastRetVal, res)
+
+                    # conflict response
+                    except sqlite.IntegrityError as e:
+                        if e.message.find('column jid is not unique') >= 0:
+                            logging.warning("[%s] Username conflict in <iq>:\n%s",
+                            self.__class__, str(e), tostring(origIQ))
+                            res = get_error_tree(origIQ, 'cancel', '409', 'conflict')
+                            return chainOutput(lastRetVal, res)
+                        else:
+                            raise e
+
+                else:
+                    raise Exception('IQ missing registration fields')
+
+            # error response
+            except Exception as e:
+                error_string = str(e)
+                logging.warning("[%s] Register failed '%s' in <iq>:\n%s",
+                            self.__class__, str(e) if error_string else 'Unknown error',
+                            tostring(origIQ))
+                res = get_error_tree(origIQ, 'modify', '406', 'not-acceptable')
+                return chainOutput(lastRetVal, res)
+
+        else:
+            logging.warning("[%s] No id in <iq>:\n%s",
+                            self.__class__, tostring(origIQ))
+
+        return lastRetVal
 
 class IQNotImplementedHandler(Handler):
     """Handler that replies to unknown iq stanzas"""

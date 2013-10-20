@@ -2,6 +2,9 @@
 
 import logging
 import pjs.threadpool as threadpool
+from pjs.db import DB, sqlite
+from contextlib import closing
+from datetime import datetime
 
 from pjs.handlers.base import ThreadedHandler, Handler, chainOutput, poll
 from pjs.elementtree.ElementTree import Element, SubElement
@@ -125,12 +128,23 @@ class S2SMessageHandler(ThreadedHandler):
                             # resource is unavailable, so send to bare JID
                             modifiedTo = toJID
                 else:
-                    # user is unavailable, so send an error, unless
+                    # user is unavailable, so save offline messages, unless
                     # this message is an error already
                     if tree.get('type') == 'error':
                         return
-                    return makeServiceUnavailableError()
 
+                    # write offline messages to database
+                    try:
+                        con = DB()
+                        with closing(con.cursor()) as cursor:
+                            cursor.execute("INSERT INTO offline (fromid, toid, time, content) \
+                                            VALUES (?, ?, ?, ?)",
+                                           (cjid.getNumId(), to.getNumId(), datetime.now(), tree[0].text))
+                            con.commit()
+                        return lastRetVal
+                    except Exception as e:
+                        logging.warning("[%s] Failed to save offline messages: %s", self.__class__, str(e))
+                        return makeServiceUnavailableError()
 
                 routeData = {
                              'to' : modifiedTo,
