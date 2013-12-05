@@ -1,12 +1,6 @@
 """Main module for starting the server"""
 
 import os, sys
-reload(sys)
-now_path = os.path.dirname(os.path.realpath(__file__))
-lib_path = os.path.abspath(os.path.join(now_path, '..'))
-sys.path.append(lib_path)
-sys.setdefaultencoding('utf-8')
-
 import pjs.conf.conf
 import logging
 
@@ -111,38 +105,42 @@ def populateDB():
     c.close()
 
 if __name__ == '__main__':
+    reload(sys)
+    sys.setdefaultencoding('utf-8')
+
     launcher = PJSLauncher()
     pjs.conf.conf.launcher = launcher
 
     # TODO: move all of this into a config file + parser
 
-    logFileName = 'server-log'
-    logDir = 'log'
-    logLoc = os.path.join(logDir, logFileName)
-    logLevel = logging.DEBUG
+    # logFileName = 'server-log'
+    # logDir = 'log'
+    # logLoc = os.path.join(logDir, logFileName)
+    # logLevel = logging.DEBUG
 
-    def configLogging(filename=logFileName, level=logLevel,
-                     format='%(asctime)s %(levelname)-8s %(message)s'):
-        try:
-            logging.basicConfig(filename=filename, level=level, format=format)
-        except IOError:
-            print >> sys.stderr, 'Could not create a log file. Logging to stderr.'
-            logging.basicConfig(level=level, format=format)
+    # def configLogging(filename=logFileName, level=logLevel,
+    #                  format='%(asctime)s %(levelname)-8s %(message)s'):
+    #     try:
+    #         logging.basicConfig(filename=filename, level=level, format=format)
+    #     except IOError:
+    #         print >> sys.stderr, 'Could not create a log file. Logging to stderr.'
+    #         logging.basicConfig(level=level, format=format)
 
-    if os.path.exists('log'):
-        if os.path.isdir('log') and os.access('log', os.W_OK):
-            configLogging(logLoc)
-        else:
-            print >> sys.stderr, 'Logging directory is not accessible'
-            configLogging()
-    else:
-        try:
-            os.mkdir('log')
-            configLogging(logLoc)
-        except IOError:
-            print >> sys.stderr, 'Could not create logging directory'
-            configLogging()
+    # if os.path.exists('log'):
+    #     if os.path.isdir('log') and os.access('log', os.W_OK):
+    #         configLogging(logLoc)
+    #     else:
+    #         print >> sys.stderr, 'Logging directory is not accessible'
+    #         configLogging()
+    # else:
+    #     try:
+    #         os.mkdir('log')
+    #         configLogging(logLoc)
+    #     except IOError:
+    #         print >> sys.stderr, 'Could not create logging directory'
+    #         configLogging()
 
+    logging.basicConfig(level=logging.DEBUG, format='%(asctime)s %(levelname)-8s %(message)s')
     populateDB()
 
     launcher.run()
