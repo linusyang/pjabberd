@@ -107,7 +107,8 @@ class C2SPresenceHandler(ThreadedHandler):
 
                         reply = Element('message', {
                             'to': toJID,
-                            'from': fromJID
+                            'from': fromJID,
+                            'type': 'chat'
                         })
 
                         body = Element('body')
@@ -126,6 +127,7 @@ class C2SPresenceHandler(ThreadedHandler):
                             'data': reply
                         }
                         offline_msgs.append(routeData)
+                    logging.debug("[%s] Sending %d offline messages to %s", self.__class__, len(offline_msgs), to_jid.getBare())
                 except Exception as e:
                     logging.warning("[%s] Failed to read offline messages: %s", self.__class__, str(e))
 

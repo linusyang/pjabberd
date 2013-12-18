@@ -141,6 +141,9 @@ class S2SMessageHandler(ThreadedHandler):
                                             VALUES (?, ?, ?, ?)",
                                            (cjid.getNumId(), to.getNumId(), datetime.now(), tree[0].text))
                             con.commit()
+                        logging.debug("[%s] Saving offline message from %s to %s: %s" % (
+                            self.__class__, cjid.getBare(), to.getBare(), tree[0].text
+                        ))
                         return lastRetVal
                     except Exception as e:
                         logging.warning("[%s] Failed to save offline messages: %s", self.__class__, str(e))

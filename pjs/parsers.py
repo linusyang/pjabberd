@@ -105,8 +105,8 @@ class IncrStreamParser:
         try:
             self._parser.Parse(data, 0)
         except Exception, e:
-            logging.warning("[%s] Parser died with %s",
-                            self.__class__, e)
+            logging.warning("[%s] Parser died with %s: %s",
+                            self.__class__, e, data)
             # TODO: complain about invalid XML and close connection
 
         if self._exception:
